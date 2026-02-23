@@ -96,5 +96,35 @@ fig_history.add_trace(go.Scatter(y=[h["Индекс качества"] for h in 
 
 fig_history.update_layout(title="История изменений прогнозов", xaxis_title="Изменения (шаги)", yaxis_title="Значение (%)", width=800, height=500)
 st.plotly_chart(fig_history, width="stretch")
+def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
+    advice = []
+
+    # pH
+    if ph_val < 6.5:
+        advice.append("Вода кислая — стоит провести известкование или проверить источник загрязнения.")
+    elif ph_val > 8.5:
+        advice.append("Вода щелочная — возможно влияние сточных вод, рекомендуется контроль источников.")
+
+    # Температура + мутность
+    if temp_val > 25 and turb_val > 5:
+        advice.append("Высокая температура и мутность — риск цветения. Рассмотрите аэрацию или биофильтрацию.")
+    elif turb_val > 8:
+        advice.append("Очень высокая мутность — вероятно механическое загрязнение. Рекомендуется фильтрация.")
+
+    # Итог по прогнозам
+    if bloom_prob >= 50:
+        advice.append("Цветение микроводорослей вероятно — примите меры по снижению температуры и мутности.")
+    if pollution_prob >= 50:
+        advice.append("Загрязнение вероятно — проверьте источники сточных вод и проведите очистку.")
+
+    if not advice:
+        advice.append("Параметры в норме, серьёзных рисков не выявлено.")
+
+    return " ".join(advice)
+
+# Выводим советы
+st.subheader("Рекомендации")
+st.info(give_advice(ph, temperature, turbidity, bloom_prob, pollution_prob))
+
 
 
