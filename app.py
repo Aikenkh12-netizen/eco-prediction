@@ -119,3 +119,7 @@ def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
         advice.append("Параметры в норме, серьёзных рисков не выявлено.")
 
     return " ".join(advice)
+
+# --- Выводим советы ---
+st.subheader("Рекомендации")
+st.info(give_advice(ph, temperature, turbidity, bloom_prob, pollution_prob))
