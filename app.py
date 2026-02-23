@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-st.title("Экологический прогноз водоёма 🌊")
+st.title("SuVision 🌊 ")
 
 # --- Ползунки ---
 ph = st.slider("pH воды", 0.0, 14.0, 7.0, 0.1)
@@ -96,3 +96,5 @@ fig_history.add_trace(go.Scatter(y=[h["Индекс качества"] for h in 
 
 fig_history.update_layout(title="История изменений прогнозов", xaxis_title="Изменения (шаги)", yaxis_title="Значение (%)", width=800, height=500)
 st.plotly_chart(fig_history, width="stretch")
+
+
