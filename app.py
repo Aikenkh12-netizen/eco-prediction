@@ -148,8 +148,10 @@ fig_bar.update_layout(title="Текущие параметры воды", yaxis_
 st.plotly_chart(fig_bar, use_container_width=True)
 
 # История изменений
+# --- История изменений ---
 if "history" not in st.session_state:
     st.session_state["history"] = []
+
 st.session_state["history"].append({
     "pH": ph,
     "Температура": temperature,
@@ -162,6 +164,34 @@ st.session_state["history"].append({
 history_data = st.session_state["history"]
 
 fig_history = go.Figure()
-fig_history.add_trace(go.Scatter(y=[h["Цветение"] for h in history_data], mode="lines+markers", name="Цветение (%)", line=dict(color="red")))
-fig_history.add_trace(go.Scatter(y=[h["Загрязнение"] for h in history_data], mode="lines+markers", name="Загрязнение (%)", line=dict(color="brown")))
-fig_history.add_trace(go.Scatter(y=[h["Индекс качества"]
+fig_history.add_trace(go.Scatter(
+    y=[h["Цветение"] for h in history_data],
+    mode="lines+markers",
+    name="Цветение (%)",
+    line=dict(color="red")
+))
+fig_history.add_trace(go.Scatter(
+    y=[h["Загрязнение"] for h in history_data],
+    mode="lines+markers",
+    name="Загрязнение (%)",
+    line=dict(color="brown")
+))
+fig_history.add_trace(go.Scatter(
+    y=[h["Индекс качества"] for h in history_data],
+    mode="lines+markers",
+    name="Качество воды",
+    line=dict(color="green")
+))
+fig_history.add_trace(go.Scatter(
+    y=[h["SRI"] for h in history_data],
+    mode="lines+markers",
+    name="SRI",
+    line=dict(color="blue")
+))
+
+fig_history.update_layout(
+    title="История изменений прогнозов",
+    xaxis_title="Изменения (шаги)",
+    yaxis_title="Значение (%)"
+)
+st.plotly_chart(fig_history, use_container_width=True)
