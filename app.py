@@ -49,7 +49,6 @@ st.info(f"Индекс устойчивости (SRI): {sri:.1f}/100")
 def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
     advice = []
 
-    # pH
     if ph_val < 6.5:
         advice.append("🔴 Вода кислая — риск коррозии труб, вымывание металлов, угнетение рыб. Совет: провести известкование, использовать нейтрализующие фильтры.")
     elif ph_val > 8.5:
@@ -57,7 +56,6 @@ def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
     else:
         advice.append("✅ pH в норме. Экосистема стабильна.")
 
-    # Температура
     if temp_val > 25:
         advice.append("⚠️ Высокая температура — ускоренный рост водорослей, риск цветения. Совет: аэрация, биофильтрация.")
     elif temp_val < 10:
@@ -65,7 +63,6 @@ def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
     else:
         advice.append("✅ Температура в норме.")
 
-    # Мутность
     if turb_val > 5:
         advice.append("⚠️ Мутность повышена — загрязнение взвешенными частицами. Совет: песчаная/угольная фильтрация, контроль источников.")
     elif turb_val <= 1:
@@ -73,14 +70,10 @@ def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
     else:
         advice.append("⚠️ Мутность умеренная — допустима, но требует контроля.")
 
-    # Прогнозы
     if bloom_prob >= 50:
         advice.append("⚠️ Цветение вероятно — примите меры по снижению температуры и мутности.")
     if pollution_prob >= 50:
         advice.append("⚠️ Загрязнение вероятно — проверьте сточные воды и проведите очистку.")
-
-    if not advice:
-        advice.append("✅ Все параметры в норме, серьёзных рисков не выявлено.")
 
     return advice
 
@@ -115,7 +108,6 @@ else:
 # --- 7. Графики ---
 st.header("📈 Визуализация данных")
 
-# Индикатор качества воды
 water_quality_index = 100 - ((bloom_prob + pollution_prob) / 2)
 fig_gauge = go.Figure(go.Indicator(
     mode="gauge+number",
@@ -130,7 +122,6 @@ fig_gauge = go.Figure(go.Indicator(
 ))
 st.plotly_chart(fig_gauge, use_container_width=True)
 
-# Bar Chart параметров
 fig_bar = go.Figure(data=[
     go.Bar(name="pH", x=["pH"], y=[ph], marker_color="blue"),
     go.Bar(name="Температура", x=["Температура"], y=[temperature], marker_color="orange"),
@@ -139,7 +130,6 @@ fig_bar = go.Figure(data=[
 fig_bar.update_layout(title="Текущие параметры воды", yaxis_title="Значение", barmode="group")
 st.plotly_chart(fig_bar, use_container_width=True)
 
-# История изменений
 if "history" not in st.session_state:
     st.session_state["history"] = []
 
@@ -155,35 +145,18 @@ st.session_state["history"].append({
 history_data = st.session_state["history"]
 
 fig_history = go.Figure()
-fig_history.add_trace(go.Scatter(
-    y=[h["Цветение"] for h in history_data],
-    mode="lines+markers",
-    name="Цветение (%)",
-    line=dict(color="red")
-))
-fig_history.add_trace(go.Scatter(
-    y=[h["Загрязнение"] for h in history_data],
-    mode="lines+markers",
-    name="Загрязнение (%)",
-    line=dict(color="brown")
-))
-fig_history.add_trace(go.Scatter(
-    y=[h["Индекс качества"] for h in history_data],
-    mode="lines+markers",
-    name="Качество воды",
-    line=dict(color="green")
-))
-fig_history.add_trace(go.Scatter(
-    y=[h["SRI"] for h in history_data],
-    mode="lines+markers",
-    name="SRI",
-    line=dict(color="blue")
-))
+fig_history.add_trace(go.Scatter(y=[h["Цветение"] for h in history_data], mode="lines+markers", name="Цветение (%)", line=dict(color="red")))
+fig_history.add_trace(go.Scatter(y=[h["Загрязнение"] for h in history_data], mode="lines+markers", name="Загрязнение (%)", line=dict(color="brown")))
+fig_history.add_trace(go.Scatter(y=[h["Индекс качества"] for h in history_data], mode="lines+markers", name="Качество воды", line=dict(color="green")))
+fig_history.add_trace(go.Scatter(y=[h["SRI"] for h in history_data], mode="lines+markers", name="SRI", line=dict(color="blue")))
 
-fig_history.update_layout(
-    title="История изменений прогнозов",
-    xaxis_title="Изменения (шаги)",
-    yaxis_title="Значение (%)"
-)
-st.plotly_chart
+fig_history.update_layout(title="История изменений прогнозов", xaxis_title="Изменения (шаги)", yaxis_title="Значение (%)")
+st.plotly_chart(fig_history, use_container_width=True)
 
+# --- 8. Контакты ---
+st.header("📩 Контакты")
+st.markdown("""
+**SuVision Project**  
+📞 Телефон: +7 (747) 193-93-37  
+✉️ Email: aiken.kh12@icloud.com  
+""")
