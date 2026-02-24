@@ -2,14 +2,18 @@ import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 
-st.title("SuVision 🌊 ")
+st.set_page_config(page_title="SuVision 🌊", layout="centered")
 
-# --- Ползунки ---
-ph = st.slider("pH воды", 0.0, 14.0, 7.0, 0.1)
-temperature = st.slider("Температура воды (°C)", 0.0, 40.0, 20.0, 0.5)
-turbidity = st.slider("Мутность воды (NTU)", 0.0, 10.0, 5.0, 0.1)
+# --- Заголовок ---
+st.title("SuVision 🌊 Экологический прогноз водоёма")
 
-# --- Модели ---
+# --- 1. Ввод параметров ---
+st.header("🔹 Ввод параметров воды")
+ph = st.slider("💧 pH воды", 0.0, 14.0, 7.0, 0.1)
+temperature = st.slider("🌡️ Температура воды (°C)", 0.0, 40.0, 20.0, 0.5)
+turbidity = st.slider("⚪ Мутность воды (NTU)", 0.0, 10.0, 5.0, 0.1)
+
+# --- 2. Модели ---
 def bloom_probability(ph_val, temp_val, turb_val):
     prob = (
         (0.4 * (7 - np.abs(ph_val - 7))) +
@@ -26,100 +30,138 @@ def pollution_probability(ph_val, temp_val, turb_val):
     ) * 10
     return np.clip(prob, 0, 100)
 
+def sri_index(ph_val, temp_val, turb_val, k=10):
+    delta_ph = abs(ph_val - 7)
+    sri = ((temp_val * delta_ph) + np.log10(max(turb_val, 0.1))) / k
+    return np.clip(sri * 10, 0, 100)
+
 bloom_prob = bloom_probability(ph, temperature, turbidity)
 pollution_prob = pollution_probability(ph, temperature, turbidity)
+sri = sri_index(ph, temperature, turbidity)
 
-# --- Прогнозы ---
+# --- 3. Прогнозы ---
+st.header("📊 Прогнозы")
 if bloom_prob >= 50:
-    st.markdown(f"<h3 style='color:red'>Цветение микроводорослей вероятно — {bloom_prob:.1f}%</h3>", unsafe_allow_html=True)
+    st.error(f"⚠️ Цветение микроводорослей вероятно — {bloom_prob:.1f}%")
 else:
-    st.markdown(f"<h3 style='color:green'>Цветение микроводорослей маловероятно — {bloom_prob:.1f}%</h3>", unsafe_allow_html=True)
+    st.success(f"✅ Цветение маловероятно — {bloom_prob:.1f}%")
 
 if pollution_prob >= 50:
-    st.markdown(f"<h3 style='color:red'>Загрязнение водоёма вероятно — {pollution_prob:.1f}%</h3>", unsafe_allow_html=True)
+    st.error(f"⚠️ Загрязнение водоёма вероятно — {pollution_prob:.1f}%")
 else:
-    st.markdown(f"<h3 style='color:green'>Загрязнение водоёма маловероятно — {pollution_prob:.1f}%</h3>", unsafe_allow_html=True)
+    st.success(f"✅ Загрязнение маловероятно — {pollution_prob:.1f}%")
 
-# --- (2) Индикатор качества воды ---
+# --- 4. Рекомендации ---
+def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
+    advice = []
+
+    # pH
+    if ph_val < 6.5:
+        advice.append("🔴 Вода кислая (<6.5) — риск коррозии труб, вымывание металлов, угнетение рыб. Совет: провести известкование, использовать нейтрализующие фильтры.")
+    elif ph_val > 8.5:
+        advice.append("🔴 Вода щелочная (>8.5) — возможны сточные воды, избыток минералов. Совет: контроль источников, обратный осмос.")
+    else:
+        advice.append("✅ pH в норме (6.5–8.5). Экосистема стабильна.")
+
+    # Температура
+    if temp_val > 25:
+        advice.append("⚠️ Высокая температура (>25°C) — ускоренный рост водорослей, риск цветения. Совет: аэрация, биофильтрация.")
+    elif temp_val < 10:
+        advice.append("⚠️ Низкая температура (<10°C) — замедление биопроцессов, снижение самоочищения. Совет: мониторинг.")
+    else:
+        advice.append("✅ Температура в норме (10–25°C).")
+
+    # Мутность
+    if turb_val > 5:
+        advice.append("⚠️ Мутность повышена (>5 NTU) — загрязнение взвешенными частицами. Совет: песчаная/угольная фильтрация, контроль источников.")
+    elif turb_val <= 1:
+        advice.append("✅ Мутность низкая (≤1 NTU) — вода прозрачная и безопасная.")
+    else:
+        advice.append("⚠️ Мутность умеренная (1–5 NTU) — допустима, но требует контроля.")
+
+    # Прогнозы
+    if bloom_prob >= 50:
+        advice.append("⚠️ Цветение вероятно — примите меры по снижению температуры и мутности.")
+    if pollution_prob >= 50:
+        advice.append("⚠️ Загрязнение вероятно — проверьте сточные воды и проведите очистку.")
+
+    if not advice:
+        advice.append("✅ Все параметры в норме, серьёзных рисков не выявлено.")
+
+    return advice
+
+st.header("💡 Рекомендации")
+for tip in give_advice(ph, temperature, turbidity, bloom_prob, pollution_prob):
+    if "✅" in tip:
+        st.success(tip)
+    elif "⚠️" in tip:
+        st.warning(tip)
+    else:
+        st.error(tip)
+
+# --- 5. Авторская формула ---
+st.header("📐 Наша авторская формула SRI")
+st.markdown("""
+Мы используем нашу авторскую формулу, разработанную совместно со специалистами:
+
+$$ SRI = \\frac{(T_{water} \\cdot \\Delta pH) + \\log_{10}(Tur)}{k} $$
+
+Эта формула учитывает температуру воды, отклонение pH от нейтрального значения и мутность, чтобы дать интегральный показатель устойчивости экосистемы.
+""")
+
+st.info(f"📊 Индекс устойчивости (SRI): {sri:.1f}/100")
+
+# --- 6. Подробный разбор ---
+st.header("🔎 Подробный разбор состояния водоёма")
+if sri > 70:
+    st.success("Высокий SRI (>70) — вода устойчива, экосистема в хорошем состоянии.")
+elif sri > 40:
+    st.warning("Средний SRI (40–70) — возможны риски, требуется мониторинг.")
+else:
+    st.error("Низкий SRI (<40) — экосистема под угрозой, необходимы меры по очистке и стабилизации.")
+
+# --- 7. Графики ---
+st.header("📈 Визуализация данных")
+
+# Индикатор качества воды
 water_quality_index = 100 - ((bloom_prob + pollution_prob) / 2)
-st.subheader("Индекс качества воды")
-if water_quality_index > 70:
-    quality_color = "green"
-elif water_quality_index > 40:
-    quality_color = "orange"
-else:
-    quality_color = "red"
-st.markdown(f"<h3 style='color:{quality_color}'>Качество воды: {water_quality_index:.1f}/100</h3>", unsafe_allow_html=True)
-
-# --- (6) Gauge Chart ---
 fig_gauge = go.Figure(go.Indicator(
     mode="gauge+number",
     value=water_quality_index,
     title={'text': "Индекс качества воды"},
     gauge={'axis': {'range': [0, 100]},
-           'bar': {'color': quality_color},
+           'bar': {'color': "green" if water_quality_index > 70 else "orange" if water_quality_index > 40 else "red"},
            'steps': [
                {'range': [0, 40], 'color': "red"},
                {'range': [40, 70], 'color': "orange"},
                {'range': [70, 100], 'color': "green"}]}
 ))
-st.plotly_chart(fig_gauge, width="stretch")
+st.plotly_chart(fig_gauge, use_container_width=True)
 
-# --- Bar Chart параметров ---
+# Bar Chart параметров
 fig_bar = go.Figure(data=[
     go.Bar(name="pH", x=["pH"], y=[ph], marker_color="blue"),
     go.Bar(name="Температура", x=["Температура"], y=[temperature], marker_color="orange"),
     go.Bar(name="Мутность", x=["Мутность"], y=[turbidity], marker_color="gray"),
 ])
-fig_bar.update_layout(title="Текущие параметры воды", yaxis_title="Значение", width=800, height=500, barmode="group")
-st.plotly_chart(fig_bar, width="stretch")
+fig_bar.update_layout(title="Текущие параметры воды", yaxis_title="Значение", barmode="group")
+st.plotly_chart(fig_bar, use_container_width=True)
 
-# --- (3) История изменений ---
+# История изменений
 if "history" not in st.session_state:
     st.session_state["history"] = []
-
 st.session_state["history"].append({
     "pH": ph,
     "Температура": temperature,
     "Мутность": turbidity,
     "Цветение": bloom_prob,
     "Загрязнение": pollution_prob,
-    "Индекс качества": water_quality_index
+    "Индекс качества": water_quality_index,
+    "SRI": sri
 })
-
 history_data = st.session_state["history"]
 
 fig_history = go.Figure()
 fig_history.add_trace(go.Scatter(y=[h["Цветение"] for h in history_data], mode="lines+markers", name="Цветение (%)", line=dict(color="red")))
 fig_history.add_trace(go.Scatter(y=[h["Загрязнение"] for h in history_data], mode="lines+markers", name="Загрязнение (%)", line=dict(color="brown")))
-fig_history.add_trace(go.Scatter(y=[h["Индекс качества"] for h in history_data], mode="lines+markers", name="Качество воды", line=dict(color="green")))
-
-fig_history.update_layout(title="История изменений прогнозов", xaxis_title="Изменения (шаги)", yaxis_title="Значение (%)", width=800, height=500)
-st.plotly_chart(fig_history, width="stretch")
-def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
-    advice = []
-
-    if ph_val < 6.5:
-        advice.append("Вода кислая — проведите известкование, проверьте источник загрязнения, используйте нейтрализующие фильтры.")
-    elif ph_val > 8.5:
-        advice.append("Вода щелочная — возможны сточные воды, рекомендуется контроль источников и фильтрация обратным осмосом.")
-
-    if temp_val > 25:
-        advice.append("Высокая температура — риск цветения. Рассмотрите аэрацию и биофильтрацию.")
-
-    if turb_val > 5:
-        advice.append("Мутность повышена — установите механическую фильтрацию и проверьте источники загрязнения.")
-
-    if bloom_prob >= 50:
-        advice.append("Цветение вероятно — примите меры по снижению температуры и мутности.")
-    if pollution_prob >= 50:
-        advice.append("Загрязнение вероятно — проверьте сточные воды и проведите очистку.")
-
-    if not advice:
-        advice.append("Параметры в норме, серьёзных рисков не выявлено.")
-
-    return " ".join(advice)
-
-# --- Выводим советы ---
-st.subheader("Рекомендации")
-st.info(give_advice(ph, temperature, turbidity, bloom_prob, pollution_prob))
+fig_history.add_trace(go.Scatter(y=[h["Индекс качества"]
