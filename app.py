@@ -8,11 +8,13 @@ st.set_page_config(page_title="SuVision 🌊", layout="centered")
 st.title("SuVision 🌊 Экологический прогноз водоёма")
 
 # --- 1. Ввод параметров ---
+
 st.header("🔹 Ввод параметров воды")
 ph = st.slider("💧 pH воды", 0.0, 14.0, 7.0, 0.1)
 temperature = st.slider("🌡️ Температура воды (°C)", 0.0, 40.0, 20.0, 0.5)
-turbidity = st.slider("⚪ Мутность воды (NTU)", 0.0, 10.0, 5.0, 0.1)
+turbidity = st.slider("⚪ Мутность воды (NTU)", 0.0, 1000.0, 5.0, 1.0)  # расширено до 1000
 
+# --- 2. Модели ---
 # --- 2. Модели ---
 def bloom_probability(ph_val, temp_val, turb_val):
     prob = (
@@ -30,14 +32,21 @@ def pollution_probability(ph_val, temp_val, turb_val):
     ) * 10
     return np.clip(prob, 0, 100)
 
-def sri_index(ph_val, temp_val, turb_val, k=10):
-    delta_ph = abs(ph_val - 7)
-    sri = ((temp_val * delta_ph) + np.log10(max(turb_val, 0.1))) / k
-    return np.clip(sri * 10, 0, 100)
+# --- адаптивный коэффициент k ---
+def adaptive_k(temp_val, turb_val):
+    # простая логика-заглушка: чем выше температура и мутность, тем меньше k
+    if temp_val > 25 and turb_val > 5:
+        return 1.2
+    elif temp_val > 15:
+        return 1.5
+    else:
+        return 2.0
 
-bloom_prob = bloom_probability(ph, temperature, turbidity)
-pollution_prob = pollution_probability(ph, temperature, turbidity)
-sri = sri_index(ph, temperature, turbidity)
+def sri_index(ph_val, temp_val, turb_val):
+    delta_ph = abs(ph_val - 7)
+    k = adaptive_k(temp_val, turb_val)  # k подбирается автоматически
+    sri = ((temp_val * delta_ph) + np.log10(max(turb_val, 0.1))) / k
+    return sri
 
 # --- 3. Прогнозы ---
 st.header("📊 Прогнозы")
