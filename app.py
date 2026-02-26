@@ -172,8 +172,9 @@ st.header("📩 Контакты")
 st.markdown("""
 **SuVision Project**  
 📞 Телефон: +7 (747) 193-93-37  
-✉️ Email: aiken.kh12@icloud.com  
+✉️ Email: aikenkhairulla32@gmail.com  
 """)
+
 
 
 
