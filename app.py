@@ -8,13 +8,11 @@ st.set_page_config(page_title="SuVision 🌊", layout="centered")
 st.title("SuVision 🌊 Экологический прогноз водоёма")
 
 # --- 1. Ввод параметров ---
-
 st.header("🔹 Ввод параметров воды")
 ph = st.slider("💧 pH воды", 0.0, 14.0, 7.0, 0.1)
 temperature = st.slider("🌡️ Температура воды (°C)", 0.0, 40.0, 20.0, 0.5)
-turbidity = st.slider("⚪ Мутность воды (NTU)", 0.0, 1000.0, 5.0, 1.0)  # расширено до 1000
+turbidity = st.slider("⚪ Мутность воды (NTU)", 0.0, 100.0, 5.0, 1.0)  # расширено до 1000
 
-# --- 2. Модели ---
 # --- 2. Модели ---
 def bloom_probability(ph_val, temp_val, turb_val):
     prob = (
@@ -34,7 +32,6 @@ def pollution_probability(ph_val, temp_val, turb_val):
 
 # --- адаптивный коэффициент k ---
 def adaptive_k(temp_val, turb_val):
-    # простая логика-заглушка: чем выше температура и мутность, тем меньше k
     if temp_val > 25 and turb_val > 5:
         return 1.2
     elif temp_val > 15:
@@ -44,15 +41,20 @@ def adaptive_k(temp_val, turb_val):
 
 def sri_index(ph_val, temp_val, turb_val):
     delta_ph = abs(ph_val - 7)
-    k = adaptive_k(temp_val, turb_val)  # k подбирается автоматически
+    k = adaptive_k(temp_val, turb_val)
     sri = ((temp_val * delta_ph) + np.log10(max(turb_val, 0.1))) / k
     return sri
+
+# --- расчёты ---
+bloom_prob = bloom_probability(ph, temperature, turbidity)
+pollution_prob = pollution_probability(ph, temperature, turbidity)
+sri = sri_index(ph, temperature, turbidity)
 
 # --- 3. Прогнозы ---
 st.header("📊 Прогнозы")
 st.success(f"Вероятность цветения: {bloom_prob:.1f}%")
 st.success(f"Вероятность загрязнения: {pollution_prob:.1f}%")
-st.info(f"Индекс устойчивости (SRI): {sri:.1f}/100")
+st.info(f"Индекс устойчивости (SRI): {sri:.1f}")
 
 # --- 4. Рекомендации ---
 def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
@@ -105,7 +107,6 @@ $$ SRI = \\frac{(T_{water} \\cdot \\Delta pH) + \\log_{10}(Tur)}{k} $$
 Эта формула учитывает температуру воды, отклонение pH от нейтрального значения и мутность, чтобы дать интегральный показатель устойчивости экосистемы.
 """)
 
-# --- 6. Подробный разбор ---
 # --- 6. Подробный разбор ---
 st.header("🔎 Подробный разбор состояния водоёма")
 if sri < 15:
@@ -162,6 +163,7 @@ fig_history.add_trace(go.Scatter(y=[h["Загрязнение"] for h in history
 fig_history.add_trace(go.Scatter(y=[h["Индекс качества"] for h in history_data], mode="lines+markers", name="Качество воды", line=dict(color="green")))
 fig_history.add_trace(go.Scatter(y=[h["SRI"] for h in history_data], mode="lines+markers", name="SRI", line=dict(color="blue")))
 
+
 fig_history.update_layout(title="История изменений прогнозов", xaxis_title="Изменения (шаги)", yaxis_title="Значение (%)")
 st.plotly_chart(fig_history, use_container_width=True)
 
@@ -172,6 +174,7 @@ st.markdown("""
 📞 Телефон: +7 (747) 193-93-37  
 ✉️ Email: aiken.kh12@icloud.com  
 """)
+
 
 
 
