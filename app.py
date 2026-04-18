@@ -11,14 +11,14 @@ st.title("SuVision 🌊 Экологический прогноз водоёма
 st.header("🔹 Ввод параметров воды")
 ph = st.slider("💧 pH воды", 0.0, 14.0, 7.0, 0.1)
 temperature = st.slider("🌡️ Температура воды (°C)", 0.0, 40.0, 20.0, 0.5)
-turbidity = st.slider("⚪ Мутность воды (NTU)", 0.0, 100.0, 5.0, 1.0)  # расширено до 1000
+turbidity = st.slider("⚪ Мутность воды (NTU)", 0.0, 100.0, 5.0, 1.0) 
 
 # --- 2. Модели ---
 def bloom_probability(ph_val, temp_val, turb_val):
     prob = (
         (0.4 * (7 - np.abs(ph_val - 7))) +
         (0.3 * (temp_val / 40 * 10)) +
-        (0.3 * turb_val)
+        (0.3 * (turb_val / 10))
     ) * 10
     return np.clip(prob, 0, 100)
 
@@ -26,24 +26,19 @@ def pollution_probability(ph_val, temp_val, turb_val):
     prob = (
         (0.3 * np.abs(ph_val - 7)) +
         (0.3 * (temp_val / 40 * 10)) +
-        (0.4 * turb_val)
+        (0.4 * (turb_val / 10))
     ) * 10
     return np.clip(prob, 0, 100)
 
-# --- адаптивный коэффициент k ---
-def adaptive_k(temp_val, turb_val):
-    if temp_val > 25 and turb_val > 5:
-        return 1.2
-    elif temp_val > 15:
-        return 1.5
-    else:
-        return 2.0
-
+# --- Упрощенная формула SRI для 8 класса ---
 def sri_index(ph_val, temp_val, turb_val):
-    delta_ph = abs(ph_val - 7)
-    k = adaptive_k(temp_val, turb_val)
-    sri = ((temp_val * delta_ph) + np.log10(max(turb_val, 0.1))) / k
-    return sri
+    # Штрафы: за отклонение pH, за высокую температуру и за мутность
+    penalty_ph = abs(ph_val - 7)
+    penalty_temp = temp_val / 10
+    penalty_turb = turb_val / 20
+    
+    sri = 10 - (penalty_ph + penalty_temp + penalty_turb)
+    return max(round(sri, 1), 0.0)
 
 # --- расчёты ---
 bloom_prob = bloom_probability(ph, temperature, turbidity)
@@ -99,24 +94,22 @@ for tip in give_advice(ph, temperature, turbidity, bloom_prob, pollution_prob):
 
 # --- 5. Авторская формула ---
 st.header("📐 Наша авторская формула SRI")
-st.markdown("""
-Мы используем нашу авторскую формулу, разработанную совместно со специалистами:
+st.markdown(r"""
+Мы используем нашу авторскую систему оценки, адаптированную для экологического мониторинга:
 
-$$ SRI = \\frac{(T_{water} \\cdot \\Delta pH) + \\log_{10}(Tur)}{k} $$
+$$ SRI = 10 - (|pH - 7| + \frac{T_{water}}{10} + \frac{Tur}{20}) $$
 
-Эта формула учитывает температуру воды, отклонение pH от нейтрального значения и мутность, чтобы дать интегральный показатель устойчивости экосистемы.
+Эта модель оценивает "запас прочности" водоема, вычитая штрафные баллы за каждое отклонение от идеальных условий.
 """)
 
-# --- 6. Подробный разбор ---
+# --- 6. Подробный разбор состояния водоёма ---
 st.header("🔎 Подробный разбор состояния водоёма")
-if sri < 15:
-    st.success(f"SRI = {sri:.1f} → Норма. Экосистема устойчива, вода в хорошем состоянии.")
-elif sri < 25:
-    st.warning(f"SRI = {sri:.1f} → Риск. Есть отклонения, возможны проблемы. Требуется мониторинг.")
-elif sri < 35:
-    st.error(f"SRI = {sri:.1f} → Высокий риск. Экосистема под угрозой, параметры значительно отклонены от нормы.")
+if sri > 7.0:
+    st.success(f"SRI = {sri} → Норма. Экосистема устойчива, вода в хорошем состоянии.")
+elif 4.0 <= sri <= 7.0:
+    st.warning(f"SRI = {sri} → Риск. Есть отклонения, возможны проблемы. Требуется мониторинг.")
 else:
-    st.error(f"SRI = {sri:.1f} → Цветение. Высокая вероятность бурного роста микроводорослей, необходимы срочные меры.")
+    st.error(f"SRI = {sri} → Критическое состояние. Экосистема под угрозой, параметры значительно отклонены от нормы.")
 
 # --- 7. Графики ---
 st.header("📈 Визуализация данных")
@@ -163,19 +156,12 @@ fig_history.add_trace(go.Scatter(y=[h["Загрязнение"] for h in history
 fig_history.add_trace(go.Scatter(y=[h["Индекс качества"] for h in history_data], mode="lines+markers", name="Качество воды", line=dict(color="green")))
 fig_history.add_trace(go.Scatter(y=[h["SRI"] for h in history_data], mode="lines+markers", name="SRI", line=dict(color="blue")))
 
-
 fig_history.update_layout(title="История изменений прогнозов", xaxis_title="Изменения (шаги)", yaxis_title="Значение (%)")
 st.plotly_chart(fig_history, use_container_width=True)
 
 # --- 8. Контакты ---
 st.header("📩 Контакты")
 st.markdown("""
-**SuVision Project**  
-📞 Телефон: +7 (747) 193-93-37  
+**SuVision Project** 📞 Телефон: +7 (747) 193-93-37  
 ✉️ Email: aikenkhairulla32@gmail.com  
 """)
-
-
-
-
-
