@@ -36,20 +36,33 @@ LAKES_DB = {
     "Озеро Тузколь": {"coords": [43.0000, 74.5000], "type": "Соленое", "risk": "Минерализация"}
 }
 
+# ====================== СОХРАНЕНИЕ ПАРАМЕТРОВ ДЛЯ КАЖДОГО ВОДОЁМА ======================
+if 'lake_params' not in st.session_state:
+    st.session_state.lake_params = {
+        name: {"ph": 7.2, "temp": 18.0, "turb": 4.0} for name in LAKES_DB.keys()
+    }
+
 # ====================== БОКОВАЯ ПАНЕЛЬ ======================
 with st.sidebar:
     st.title("🚀 SuVision Core")
     selected_name = st.selectbox("🎯 Станция мониторинга", list(LAKES_DB.keys()))
     lake = LAKES_DB[selected_name]
-   
+  
     st.divider()
     st.header("🔹 Параметры воды")
-    ph = st.slider("pH", 0.0, 14.0, 7.2, 0.1)
-    temp = st.slider("Температура (°C)", 0.0, 40.0, 18.0, 0.5)
-    turb = st.slider("Мутность (NTU)", 0.0, 100.0, 4.0, 1.0)
-   
+    
+    # Загружаем сохранённые параметры текущего водоёма
+    current = st.session_state.lake_params[selected_name]
+    
+    ph = st.slider("pH", 0.0, 14.0, current["ph"], 0.1)
+    temp = st.slider("Температура (°C)", 0.0, 40.0, current["temp"], 0.5)
+    turb = st.slider("Мутность (NTU)", 0.0, 100.0, current["turb"], 1.0)
+  
     if st.button("🔄 Симулировать новые измерения", use_container_width=True):
         st.rerun()
+
+    # Сохраняем изменения сразу
+    st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
 
 # ====================== РАСЧЁТЫ ======================
 def calculate_sri(p, t, tr):
@@ -85,7 +98,7 @@ SRI: {sri}/10
         "temperature": 0.65
     }
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-   
+  
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=12)
         if response.status_code == 200:
@@ -94,18 +107,17 @@ SRI: {sri}/10
     except Exception as e:
         return f"Ошибка подключения: {str(e)}"
 
-# ====================== ИСПРАВЛЕННАЯ ФУНКЦИЯ АНАЛИЗА ФОТО ======================
 def analyze_photo_with_groq(image_file, lake_name):
     if image_file is None:
         return "Нет изображения для анализа."
-    
+   
     image_bytes = image_file.getvalue()
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
-    
+   
     url = "https://api.groq.com/openai/v1/chat/completions"
-    
+   
     prompt = f"""Ты — эксперт-гидролог и эколог по водоёмам Казахстана, особенно {lake_name}.
-    
+   
 Проанализируй это фото воды внимательно:
 - Оценка мутности (низкая / средняя / высокая) + примерное значение в NTU
 - Цвет воды и возможные причины
@@ -116,7 +128,7 @@ def analyze_photo_with_groq(image_file, lake_name):
 Отвечай на русском языке чётко, по делу, используй эмодзи где уместно."""
 
     payload = {
-        "model": "meta-llama/llama-4-scout-17b-16e-instruct",   # ← ИСПРАВЛЕНО!
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
         "messages": [
             {
                 "role": "user",
@@ -129,13 +141,13 @@ def analyze_photo_with_groq(image_file, lake_name):
         "max_tokens": 400,
         "temperature": 0.5
     }
-    
+   
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    
+   
     try:
         with st.spinner("🤖 Groq Vision анализирует фото... (может занять 4–10 секунд)"):
             response = requests.post(url, json=payload, headers=headers, timeout=30)
-            
+           
             if response.status_code == 200:
                 return response.json()['choices'][0]['message']['content'].strip()
             else:
@@ -162,11 +174,11 @@ tab1, tab2, tab3 = st.tabs(["🗺️ Карта & ИИ", "📷 Анализ по
 
 with tab1:
     col_map, col_ai = st.columns([2, 1])
-    
+   
     with col_map:
         st.subheader("🗺️ Карта мониторинга")
         m = folium.Map(location=lake["coords"], zoom_start=5, tiles="CartoDB dark_matter")
-        
+       
         for name, info in LAKES_DB.items():
             is_target = (name == selected_name)
             color = "green" if sri > 7 else "orange" if sri > 4 else "red"
@@ -178,9 +190,9 @@ with tab1:
                 fillOpacity=0.8,
                 popup=f"{name}<br>SRI: {sri}<br>{status_text}"
             ).add_to(m)
-        
+       
         st_folium(m, width="100%", height=480)
-    
+   
     with col_ai:
         st.subheader("🤖 ИИ-Анализ (Groq)")
         if st.button("🚀 Запустить диагностику", type="primary", use_container_width=True):
@@ -208,11 +220,11 @@ with tab2:
     st.subheader("📷 Анализ качества воды по фотографии")
     uploaded_file = st.file_uploader("Загрузите фото воды", type=["jpg", "jpeg", "png"])
     camera_file = st.camera_input("Или сделайте фото через камеру")
-   
+  
     photo = uploaded_file or camera_file
     if photo:
         st.image(photo, caption="Фото для анализа", use_container_width=True)
-       
+      
         if st.button("🔍 Запустить профессиональный анализ фото", type="primary"):
             analysis = analyze_photo_with_groq(photo, selected_name)
             st.success("✅ Анализ фото завершён")
@@ -222,21 +234,22 @@ with tab3:
     st.subheader("📈 История измерений")
     if 'history' not in st.session_state:
         st.session_state.history = []
-   
+  
     if st.button("📌 Сохранить текущие показания"):
         st.session_state.history.append({
             "Время": datetime.now().strftime("%H:%M"),
             "pH": ph,
             "Температура": temp,
             "Мутность": turb,
-            "SRI": sri
+            "SRI": sri,
+            "Водоём": selected_name
         })
         st.success("Показания сохранены!")
-   
+  
     if st.session_state.history:
         df = pd.DataFrame(st.session_state.history)
         st.dataframe(df, use_container_width=True)
     else:
         st.info("Пока нет сохранённых измерений.")
 
-st.caption("SuVision Global AI • Работает на Groq • Мониторинг водоёмов Казахстана 💧")
+st.caption("SuVision Global AI • Работает на Groq • Параметры сохраняются отдельно для каждого водоёма 💧")
