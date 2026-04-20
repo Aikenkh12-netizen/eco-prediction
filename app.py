@@ -3,144 +3,140 @@ import plotly.graph_objects as go
 import numpy as np
 import folium
 from streamlit_folium import st_folium
+import google.generativeai as genai
 
-# Настройка страницы
-st.set_page_config(page_title="SuVision 🌊", layout="wide")
+# --- КОНФИГУРАЦИЯ ИИ ---
+# Вставь свой ключ сюда (получи на aistudio.google.com)
+API_KEY = "AIzaSyCNR93IXF2oGPYlfuI345Xh0FvUMF8WTHI" 
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- БАЗА ДАННЫХ ВОДОЕМОВ ---
-LAKES = {
-    "Озеро Сайран": {"coords": [43.2389, 76.8897], "desc": "Городское водохранилище"},
-    "БАО (Большое Алматинское)": {"coords": [43.0506, 76.9849], "desc": "Высокогорный источник"},
-    "Капчагайское вдхр.": {"coords": [43.7844, 77.0653], "desc": "Рекреационная зона"},
-    "Первомайские пруды": {"coords": [43.3711, 76.9455], "desc": "Местный водоем"}
+# --- НАСТРОЙКА СТРАНИЦЫ ---
+st.set_page_config(page_title="SuVision Global AI", layout="wide")
+
+# --- БАЗА ДАННЫХ ВОДОЕМОВ (10 ОБЪЕКТОВ) ---
+LAKES_DB = {
+    "Каспийское море": {"coords": [43.6500, 51.1500], "type": "Морской", "risk": "Нефтяные загрязнения"},
+    "Озеро Балхаш": {"coords": [46.5400, 74.8700], "type": "Бессточный", "risk": "Тяжелые металлы"},
+    "БАО (Алматы)": {"coords": [43.0506, 76.9849], "type": "Высокогорный", "risk": "Бактериальное загрязнение"},
+    "Озеро Алаколь": {"coords": [46.1200, 81.7400], "type": "Соленое", "risk": "Антропогенная нагрузка"},
+    "Боровое": {"coords": [53.0800, 70.3000], "type": "Пресноводный", "risk": "Цветение воды (эвтрофикация)"},
+    "Река Иртыш": {"coords": [49.9500, 82.6100], "type": "Речной", "risk": "Промышленные стоки"},
+    "Озеро Маркаколь": {"coords": [48.5100, 85.8000], "type": "Заповедный", "risk": "Изменение климата"},
+    "Озеро Сайран": {"coords": [43.2389, 76.8897], "type": "Городской", "risk": "Ливневые стоки"},
+    "Шардаринское вдхр.": {"coords": [41.2500, 67.9800], "type": "Ирригационный", "risk": "Пестициды"},
+    "Озеро Тенгиз": {"coords": [50.4000, 68.9000], "type": "Соленое/Заболоченное", "risk": "Гидрологический баланс"}
 }
 
-# --- Заголовок ---
-st.title("SuVision 🌊 Экологический прогноз водоёма")
-
-# --- 1. Ввод параметров (SIDEBAR) ---
-st.sidebar.header("📍 Выбор локации")
-selected_lake_name = st.sidebar.selectbox("Выберите водоем:", list(LAKES.keys()))
-selected_lake = LAKES[selected_lake_name]
-
-st.sidebar.divider()
-st.sidebar.header("🔹 Ввод параметров воды")
-ph = st.sidebar.slider("💧 pH воды", 0.0, 14.0, 7.0, 0.1)
-temperature = st.sidebar.slider("🌡️ Температура воды (°C)", 0.0, 40.0, 20.0, 0.5)
-turbidity = st.sidebar.slider("⚪ Мутность воды (NTU)", 0.0, 100.0, 5.0, 1.0) 
-
-# --- 2. Модели (БЕЗ ИЗМЕНЕНИЙ) ---
-def bloom_probability(ph_val, temp_val, turb_val):
-    prob = ((0.4 * (7 - np.abs(ph_val - 7))) + (0.3 * (temp_val / 40 * 10)) + (0.3 * (turb_val / 10))) * 10
-    return np.clip(prob, 0, 100)
-
-def pollution_probability(ph_val, temp_val, turb_val):
-    prob = ((0.3 * np.abs(ph_val - 7)) + (0.3 * (temp_val / 40 * 10)) + (0.4 * (turb_val / 10))) * 10
-    return np.clip(prob, 0, 100)
-
-def sri_index(ph_val, temp_val, turb_val):
-    penalty_ph = abs(ph_val - 7)
-    penalty_temp = temp_val / 10
-    penalty_turb = turb_val / 20
-    sri = 10 - (penalty_ph + penalty_temp + penalty_turb)
-    return max(round(sri, 1), 0.0)
-
-bloom_prob = bloom_probability(ph, temperature, turbidity)
-pollution_prob = pollution_probability(ph, temperature, turbidity)
-sri = sri_index(ph, temperature, turbidity)
-
-# --- НОВЫЙ БЛОК: КАРТА С ВЫБОРОМ ---
-st.header(f"📍 Мониторинг: {selected_lake_name}")
-col_map, col_info = st.columns([2, 1])
-
-with col_map:
-    # Карта центрируется на выбранном озере
-    m = folium.Map(location=selected_lake["coords"], zoom_start=12)
+# --- БОКОВАЯ ПАНЕЛЬ ---
+with st.sidebar:
+    st.title("🚀 SuVision AI Core")
+    st.write("Система глобального мониторинга v2.0")
+    st.divider()
     
-    # Отрисовываем все точки из базы
-    for name, data in LAKES.items():
-        if name == selected_lake_name:
-            # Цвет активной точки зависит от SRI
-            marker_color = "green" if sri > 7.0 else "orange" if sri >= 4.0 else "red"
-            icon_type = "star"
-        else:
-            # Остальные точки просто синие
-            marker_color = "blue"
-            icon_type = "info-sign"
-            
-        folium.Marker(
-            location=data["coords"],
-            popup=f"{name}: {data['desc']}",
-            tooltip=name,
-            icon=folium.Icon(color=marker_color, icon=icon_type)
+    selected_name = st.selectbox("🎯 Выберите станцию", list(LAKES_DB.keys()))
+    lake = LAKES_DB[selected_name]
+    
+    st.subheader("📡 Данные датчиков")
+    ph = st.slider("Уровень pH", 0.0, 14.0, 7.2, 0.1)
+    temp = st.slider("Температура воды (°C)", 0.0, 40.0, 18.0, 0.5)
+    turb = st.slider("Мутность (NTU)", 0.0, 100.0, 4.0, 1.0)
+    
+    st.divider()
+    st.caption("Статус системы: В сети 🟢")
+
+# --- ЛОГИКА SRI ---
+def calculate_sri(p, t, tr):
+    penalty = abs(p - 7) * 1.5 + (t / 10) * 0.8 + (tr / 20) * 1.2
+    return max(round(10 - penalty, 2), 0.0)
+
+sri = calculate_sri(ph, temp, turb)
+
+# --- ФУНКЦИЯ ИИ (GEMINI API) ---
+def get_ai_report(lake_name, ph, temp, turb, sri, risk):
+    prompt = f"""
+    Действуй как профессиональный эксперт-эколог. Проанализируй данные воды для объекта {lake_name} (тип: {lake['type']}).
+    Параметры: pH {ph}, Температура {temp}C, Мутность {turb} NTU. 
+    Рассчитанный индекс устойчивости (SRI): {sri}/10. 
+    Основной локальный риск: {risk}.
+    Дай краткий научный анализ на РУССКОМ языке (макс. 60 слов). 
+    Сфокусируйся на связи между текущими данными и рисками региона.
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "ИИ-анализ временно недоступен. Проверьте API-ключ или интернет-соединение."
+
+# --- ОСНОВНОЙ ИНТЕРФЕЙС ---
+st.title("🌊 SuVision: Интеллектуальный эко-мониторинг")
+st.markdown(f"**Текущий объект:** {selected_name} | **Профиль риска:** {lake['risk']}")
+
+col_left, col_right = st.columns([2, 1])
+
+with col_left:
+    st.subheader("🗺️ Геопространственный анализ")
+    # Профессиональная темная карта
+    m = folium.Map(location=lake["coords"], zoom_start=7, tiles="CartoDB dark_matter")
+    
+    for name, info in LAKES_DB.items():
+        is_target = (name == selected_name)
+        color = "cyan" if not is_target else ("green" if sri > 7 else "orange" if sri > 4 else "red")
+        folium.CircleMarker(
+            location=info["coords"],
+            radius=12 if is_target else 6,
+            color=color,
+            fill=True,
+            popup=name
         ).add_to(m)
-        
-    st_folium(m, width=700, height=400, key=f"map_{selected_lake_name}")
+    st_folium(m, width="100%", height=500, key=f"map_{selected_name}")
 
-with col_info:
-    st.write("### Информация об объекте")
-    st.write(f"**Название:** {selected_lake_name}")
-    st.write(f"**Тип:** {selected_lake['desc']}")
-    st.write(f"**Координаты:** {selected_lake['coords'][0]}, {selected_lake['coords'][1]}")
-    st.write(f"**Текущее состояние:** {'Стабильно' if sri > 7.0 else 'Риск' if sri >= 4.0 else 'Критично'}")
-    st.info("Выберите другой водоем в панели слева для смены локации.")
-
-# --- 3. Прогнозы (БЕЗ ИЗМЕНЕНИЙ) ---
-st.header("📊 Прогнозы")
-st.success(f"Вероятность цветения: {bloom_prob:.1f}%")
-st.success(f"Вероятность загрязнения: {pollution_prob:.1f}%")
-st.info(f"Индекс устойчивости (SRI): {sri:.1f}")
-
-# --- 4. Рекомендации (БЕЗ ИЗМЕНЕНИЙ) ---
-def give_advice(ph_val, temp_val, turb_val, bloom_prob, pollution_prob):
-    advice = []
-    if ph_val < 6.5: advice.append("🔴 Вода кислая — риск коррозии труб.")
-    elif ph_val > 8.5: advice.append("🔴 Вода щелочная — возможны сточные воды.")
-    else: advice.append("✅ pH в норме.")
+with col_right:
+    st.subheader("🤖 ИИ-Диагностика")
     
-    if temp_val > 25: advice.append("⚠️ Высокая температура — риск цветения.")
-    elif temp_val < 10: advice.append("⚠️ Низкая температура — замедление процессов.")
-    else: advice.append("✅ Температура в норме.")
+    if st.button("Сгенерировать отчет ИИ"):
+        with st.spinner("Запрос к Gemini AI..."):
+            ai_report = get_ai_report(selected_name, ph, temp, turb, sri, lake['risk'])
+            st.markdown(f"**Заключение эксперта ИИ:**\n\n{ai_report}")
+    else:
+        st.info("Нажмите кнопку выше для запуска нейросетевого анализа состояния среды.")
+
+    st.divider()
+    st.metric("Индекс устойчивости (SRI)", f"{sri}/10", delta=round(sri-7, 2))
     
-    if turb_val > 5: advice.append("⚠️ Мутность повышена.")
-    else: advice.append("✅ Прозрачность в норме.")
-    
-    return advice
+    # Визуализация Gauge
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number", value=sri,
+        gauge={'axis': {'range': [0, 10]},
+               'bar': {'color': "#00f2fe"},
+               'steps': [{'range': [0, 4], 'color': "#330000"},
+                         {'range': [4, 7], 'color': "#443300"},
+                         {'range': [7, 10], 'color': "#003311"}]}
+    ))
+    fig.update_layout(height=230, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="rgba(0,0,0,0)", font={'color':"white"})
+    st.plotly_chart(fig, use_container_width=True)
 
-st.header("💡 Рекомендации")
-for tip in give_advice(ph, temperature, turbidity, bloom_prob, pollution_prob):
-    if "✅" in tip: st.success(tip)
-    elif "⚠️" in tip: st.warning(tip)
-    else: st.error(tip)
+# --- НАУЧНЫЕ РЕКОМЕНДАЦИИ ---
+st.header("💡 Научные рекомендации")
+rec_col1, rec_col2, rec_col3 = st.columns(3)
 
-# --- 5. Авторская формула (БЕЗ ИЗМЕНЕНИЙ) ---
-st.header("📐 Наша авторская формула SRI")
-st.markdown(r"$$ SRI = 10 - (|pH - 7| + \frac{T_{water}}{10} + \frac{Tur}{20}) $$")
+with rec_col1:
+    if ph < 6.5 or ph > 8.5:
+        st.error(f"**Химическая угроза:** pH {ph} нестабилен для типа '{lake['type']}'. Проверьте наличие промышленных стоков.")
+    else:
+        st.success("Химический баланс в норме.")
 
-# --- 6. Подробный разбор (БЕЗ ИЗМЕНЕНИЙ) ---
-st.header("🔎 Подробный разбор состояния водоёма")
-if sri > 7.0: st.success(f"SRI = {sri} → Норма.")
-elif 4.0 <= sri <= 7.0: st.warning(f"SRI = {sri} → Риск.")
-else: st.error(f"SRI = {sri} → Критическое состояние.")
+with rec_col2:
+    if temp > 25:
+        st.warning("**Тепловой риск:** Высокая температура снижает уровень растворенного кислорода.")
+    else:
+        st.success("Температурный режим стабилен.")
 
-# --- 7. Графики (БЕЗ ИЗМЕНЕНИЙ) ---
-st.header("📈 Визуализация данных")
-water_quality_index = 100 - ((bloom_prob + pollution_prob) / 2)
-fig_gauge = go.Figure(go.Indicator(
-    mode="gauge+number",
-    value=water_quality_index,
-    title={'text': "Индекс качества воды"},
-    gauge={'axis': {'range': [0, 100]},
-           'bar': {'color': "green" if water_quality_index > 70 else "orange" if water_quality_index > 40 else "red"},
-           'steps': [{'range': [0, 40], 'color': "red"},
-                     {'range': [40, 70], 'color': "orange"},
-                     {'range': [70, 100], 'color': "green"}]}
-))
-st.plotly_chart(fig_gauge, use_container_width=True)
+with rec_col3:
+    if turb > 10:
+        st.error("**Предупреждение о мутности:** Обнаружено высокое содержание взвесей.")
+    else:
+        st.success("Прозрачность воды в пределах нормы.")
 
-# --- 8. Контакты (БЕЗ ИЗМЕНЕНИЙ) ---
-st.header("📩 Контакты")
-st.markdown("""
-**SuVision Project** 📞 Телефон: +7 (747) 193-93-37  
-✉️ Email: aikenkhairulla32@gmail.com  
-""")
+st.markdown("---")
+st.caption("Проект SuVision | На базе Gemini AI | Разработано для международных соревнований 2026")
