@@ -28,7 +28,7 @@ LAKES_DB = {
     "Озеро Сайран": {"coords": [43.2389, 76.8897], "type": "Городской", "risk": "Ливневые стоки и бытовые отходы"},
     "Капчагайское водохранилище": {"coords": [43.7844, 77.0653], "type": "Рекреационный", "risk": "Рекреационная нагрузка"},
     "Шардаринское водохранилище": {"coords": [41.2500, 67.9800], "type": "Ирригационный", "risk": "Пестициды и сельское хозяйство"},
-    "Озеро Борли": {"coords": [53.0800, 70.3000], "type": "Пресноводный", "risk": "Эвтрофикация"},  # Боровое / Борли
+    "Озеро Борли (Боровое)": {"coords": [53.0800, 70.3000], "type": "Пресноводный", "risk": "Эвтрофикация"},
     "Озеро Иссык": {"coords": [43.2500, 77.4800], "type": "Горное", "risk": "Селевые риски"},
     "Озеро Кольсай": {"coords": [42.9300, 78.3300], "type": "Горное", "risk": "Туризм и экология"},
     "Озеро Кайынды": {"coords": [42.9800, 78.4500], "type": "Горное", "risk": "Туризм"},
@@ -77,7 +77,7 @@ SRI: {sri}/10
 Ответь ровно двумя предложениями на русском:
 1. Оценка текущего состояния.
 2. Главная рекомендация."""
-    
+
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
@@ -94,6 +94,7 @@ SRI: {sri}/10
     except Exception as e:
         return f"Ошибка подключения: {str(e)}"
 
+# ====================== ИСПРАВЛЕННАЯ ФУНКЦИЯ АНАЛИЗА ФОТО ======================
 def analyze_photo_with_groq(image_file, lake_name):
     if image_file is None:
         return "Нет изображения для анализа."
@@ -108,14 +109,14 @@ def analyze_photo_with_groq(image_file, lake_name):
 Проанализируй это фото воды внимательно:
 - Оценка мутности (низкая / средняя / высокая) + примерное значение в NTU
 - Цвет воды и возможные причины
-- Признаки загрязнения (нефтяная плёнка, водоросли, пена, мусор, масляные пятна и т.д.)
+- Признаки загрязнения (нефтяная плёнка, водоросли, пена, мусор, масляные пятна, цветение и т.д.)
 - Общая оценка качества воды (1–10)
 - Главная рекомендация, что делать сейчас
 
 Отвечай на русском языке чётко, по делу, используй эмодзи где уместно."""
 
     payload = {
-        "model": "llama-4-scout-17b-16e-instruct",   # Vision-модель
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",   # ← ИСПРАВЛЕНО!
         "messages": [
             {
                 "role": "user",
@@ -132,12 +133,15 @@ def analyze_photo_with_groq(image_file, lake_name):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     
     try:
-        with st.spinner("🤖 Groq Vision анализирует фото... (3–8 сек)"):
-            response = requests.post(url, json=payload, headers=headers, timeout=25)
+        with st.spinner("🤖 Groq Vision анализирует фото... (может занять 4–10 секунд)"):
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
             if response.status_code == 200:
                 return response.json()['choices'][0]['message']['content'].strip()
             else:
-                return f"Ошибка Groq Vision ({response.status_code})"
+                return f"Ошибка Groq Vision ({response.status_code}): {response.text[:300]}"
+    except requests.exceptions.Timeout:
+        return "⏳ Таймаут. Попробуй фото меньшего размера или позже."
     except Exception as e:
         return f"Ошибка анализа фото: {str(e)}"
 
