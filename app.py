@@ -6,8 +6,9 @@ import requests
 from datetime import datetime
 import pandas as pd
 import base64
-import serial   # ← новый импорт
+import serial
 import time
+import os  # ← добавлен для определения ОС (Windows / Linux)
 
 # ====================== КОНФИГУРАЦИЯ ======================
 st.set_page_config(
@@ -25,13 +26,12 @@ st.markdown("""
         background: linear-gradient(180deg, #0a1428 0%, #0f253f 100%);
         color: #e0f7ff;
     }
-    
+   
     .main .block-container {
         padding-top: 1.5rem;
         padding-bottom: 3rem;
         max-width: 1400px;
     }
-
     /* ====================== ЗАГОЛОВОК ====================== */
     .main-header {
         background: linear-gradient(90deg, #00d4ff, #0099cc);
@@ -58,7 +58,6 @@ st.markdown("""
     @keyframes shine {
         100% { transform: translateX(200%); }
     }
-
     /* ====================== СТАТУС ====================== */
     .status-container {
         background: rgba(255,255,255,0.08);
@@ -72,7 +71,6 @@ st.markdown("""
         justify-content: space-between;
         box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     }
-
     /* ====================== МЕТРИКИ ====================== */
     .stMetric {
         background: rgba(255,255,255,0.09) !important;
@@ -94,7 +92,6 @@ st.markdown("""
         font-size: 1.65rem !important;
         font-weight: 700;
     }
-
     /* ====================== КНОПКИ ====================== */
     .stButton button {
         background: linear-gradient(90deg, #00d4ff, #00aaff) !important;
@@ -111,7 +108,6 @@ st.markdown("""
         transform: translateY(-3px) scale(1.03);
         box-shadow: 0 12px 28px rgba(0, 212, 255, 0.45) !important;
     }
-
     /* ====================== САЙДБАР ====================== */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0a1f35, #0f2a45) !important;
@@ -157,28 +153,29 @@ with st.sidebar:
     lake = LAKES_DB[selected_name]
     st.divider()
     st.header("🔹 Параметры воды")
-    
+   
     current = st.session_state.lake_params[selected_name]
-    
+   
     ph = st.slider("pH", 0.0, 14.0, current["ph"], 0.1)
     temp = st.slider("Температура (°C)", 0.0, 40.0, current["temp"], 0.5)
     turb = st.slider("Мутность (NTU)", 0.0, 100.0, current["turb"], 1.0)
-    
+   
     if st.button("🔄 Симулировать новые измерения", use_container_width=True):
         st.rerun()
-
     st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
 
-    # ====================== НОВАЯ СЕКЦИЯ ARDUINO ======================
+    # ====================== ОБНОВЛЁННАЯ СЕКЦИЯ ARDUINO ======================
     st.divider()
     st.subheader("🔌 Arduino Uno (датчики)")
-    
+   
     col_p, col_b = st.columns(2)
     with col_p:
-        com_port = st.text_input("COM-порт", value="COM5")
+        # Автоматический выбор дефолтного порта в зависимости от ОС
+        default_port = "COM5" if os.name == "nt" else "/dev/ttyUSB0"
+        com_port = st.text_input("COM-порт / tty", value=default_port)
     with col_b:
         baud_rate = st.selectbox("Скорость (baud)", [9600, 115200], index=0)
-    
+   
     if st.button("🔌 Подключить Arduino", use_container_width=True, type="primary"):
         try:
             if st.session_state.ser is None or not st.session_state.ser.is_open:
@@ -186,12 +183,13 @@ with st.sidebar:
                 st.success(f"✅ Подключено к {com_port}")
                 st.rerun()
         except Exception as e:
-            st.error(f"❌ Ошибка подключения: {e}")
-    
+            st.error(f"❌ Не удалось подключиться к {com_port}")
+            st.caption("💡 **Подсказка**: Запусти приложение **локально** (`streamlit run app.py`) и подключи Arduino. В облаке (Streamlit Cloud и т.п.) COM-порты недоступны.")
+
     # Если Arduino подключён
     if st.session_state.ser and st.session_state.ser.is_open:
         st.markdown('<div class="arduino-connected">🟢 Arduino подключён • Данные поступают</div>', unsafe_allow_html=True)
-        
+       
         if st.button("📡 Прочитать данные с датчиков СЕЙЧАС", use_container_width=True, type="primary"):
             try:
                 line = st.session_state.ser.readline().decode('utf-8').strip()
@@ -201,7 +199,7 @@ with st.sidebar:
                         if ":" in item:
                             k, v = item.split(":")
                             data[k.strip().lower()] = float(v.strip())
-                    
+                   
                     st.session_state.lake_params[selected_name] = {
                         "ph": round(data.get("ph", ph), 2),
                         "temp": round(data.get("temp", temp), 1),
@@ -213,7 +211,7 @@ with st.sidebar:
                     st.warning("⚠️ Данные не распознаны. Проверьте формат в скетче Arduino")
             except Exception as e:
                 st.error(f"Ошибка чтения: {e}")
-        
+       
         if st.button("🔌 Отключить Arduino", use_container_width=True):
             st.session_state.ser.close()
             st.session_state.ser = None
@@ -222,9 +220,10 @@ with st.sidebar:
 
     st.caption("Ожидаемый формат от Arduino:\n`ph:7.45,temp:23.1,turb:4.2`")
 
-# ====================== РАСЧЁТЫ (без изменений) ======================
+# ====================== РАСЧЁТЫ ======================
 def calculate_sri(p, t, tr):
     return max(round(10 - (abs(p-7)*1.5 + (t/10)*0.8 + (tr/20)*1.2), 2), 0.0)
+
 sri = calculate_sri(ph, temp, turb)
 
 def get_status(ph_val, temp_val, turb_val):
@@ -233,9 +232,10 @@ def get_status(ph_val, temp_val, turb_val):
     elif turb_val > 5 or abs(ph_val - 7) > 1 or temp_val > 25:
         return "🟠 Внимание", "warning"
     return "🟢 Норма", "normal"
+
 status_text, status_type = get_status(ph, temp, turb)
 
-# ====================== Groq функции (без изменений) ======================
+# ====================== Groq функции ======================
 def get_ai_report(lake_name, ph, temp, turb, sri, risk):
     url = "https://api.groq.com/openai/v1/chat/completions"
     prompt = f"""Ты опытный эколог-гидролог. Кратко проанализируй состояние водоёма.
@@ -318,7 +318,6 @@ with tab1:
                                 color=color if is_target else "#00ffff", fill=True, fillOpacity=0.9,
                                 popup=f"{name}<br>SRI: {sri}<br>{status_text}").add_to(m)
         st_folium(m, width="100%", height=520)
-
     with col_ai:
         st.subheader("🤖 ИИ-Анализ (Groq)")
         if st.button("🚀 Запустить диагностику", type="primary", use_container_width=True):
