@@ -4,4 +4,4 @@ numpy
 folium
 streamlit-folium
 google-generativeai
-Serial
+serial
