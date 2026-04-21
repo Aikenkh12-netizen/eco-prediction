@@ -16,30 +16,59 @@ st.set_page_config(
 
 GROQ_API_KEY = "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"
 
-# ====================== 🎨 СТИЛЬ ======================
+# ====================== 🎨 ЧИСТЫЙ СТИЛЬ ======================
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(to right, #0f172a, #020617);
-    color: white;
+    background-color: #0b1220;
+    color: #e5e7eb;
 }
-.block-container {
-    padding-top: 2rem;
+
+/* Заголовки */
+h1, h2, h3 {
+    font-weight: 600;
+}
+
+/* Карточки */
+.card {
+    background: #111827;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* Подписи */
+.label {
+    font-size: 13px;
+    color: #9ca3af;
+}
+
+/* Значения */
+.value {
+    font-size: 26px;
+    font-weight: 600;
+}
+
+/* Статусы */
+.status {
+    padding: 14px;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.ok { background: rgba(34,197,94,0.1); color: #4ade80; }
+.warn { background: rgba(245,158,11,0.1); color: #fbbf24; }
+.bad { background: rgba(239,68,68,0.1); color: #f87171; }
+
+/* AI блок */
+.ai-box {
+    background:#111827;
+    padding:15px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.05);
 }
 </style>
-""", unsafe_allow_html=True)
-
-# ====================== 🎨 HEADER ======================
-st.markdown("""
-<div style="
-background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-padding: 25px;
-border-radius: 20px;
-margin-bottom:15px;
-">
-<h1 style='color:white;'>🌊 SuVision</h1>
-<p style='color:#cbd5e1;'>Глобальный AI-мониторинг водоёмов Казахстана</p>
-</div>
 """, unsafe_allow_html=True)
 
 # ====================== БАЗА ДАННЫХ ======================
@@ -96,49 +125,32 @@ sri = calculate_sri(ph, temp, turb)
 
 def get_status(ph_val, temp_val, turb_val):
     if not (6.5 <= ph_val <= 8.5) or turb_val > 10 or temp_val > 30:
-        return "🔴 Опасно", "error"
+        return "🔴 Опасно", "bad"
     elif turb_val > 5 or abs(ph_val - 7) > 1 or temp_val > 25:
-        return "🟠 Внимание", "warning"
-    return "🟢 Норма", "normal"
+        return "🟠 Внимание", "warn"
+    return "🟢 Норма", "ok"
 
-status_text, status_type = get_status(ph, temp, turb)
+status_text, status_class = get_status(ph, temp, turb)
 
-# ====================== 🎨 СТАТУС ПАНЕЛЬ ======================
-color_map = {"error": "#ef4444", "warning": "#f59e0b", "normal": "#22c55e"}
+# ====================== СТАТУС ======================
+st.markdown(f"<div class='status {status_class}'>{status_text}</div>", unsafe_allow_html=True)
 
-st.markdown(f"""
-<div style="
-background: {color_map[status_type]};
-padding: 20px;
-border-radius: 15px;
-text-align: center;
-margin-bottom:20px;
-">
-<h2 style="color:white;">{status_text}</h2>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(f"**{selected_name}** • {lake['risk']}")
 
-st.markdown(f"**Объект:** `{selected_name}` | **Основной риск:** {lake['risk']}")
-
-# ====================== 🎨 КАРТОЧКИ ======================
-def card(title, value, color):
+# ====================== КАРТОЧКИ ======================
+def card(title, value):
     st.markdown(f"""
-    <div style="
-    background: #111827;
-    padding: 20px;
-    border-radius: 15px;
-    border-left: 5px solid {color};
-    ">
-    <p style="color: #9ca3af;">{title}</p>
-    <h2 style="color: white;">{value}</h2>
+    <div class="card">
+        <div class="label">{title}</div>
+        <div class="value">{value}</div>
     </div>
     """, unsafe_allow_html=True)
 
-col1, col2, col3, col4 = st.columns(4)
-with col1: card("pH", f"{ph:.2f}", "#3b82f6")
-with col2: card("Температура", f"{temp} °C", "#f59e0b")
-with col3: card("Мутность", f"{turb} NTU", "#06b6d4")
-with col4: card("SRI", f"{sri}/10", "#22c55e")
+c1, c2, c3, c4 = st.columns(4)
+with c1: card("pH", f"{ph:.2f}")
+with c2: card("Температура", f"{temp} °C")
+with c3: card("Мутность", f"{turb} NTU")
+with c4: card("SRI", f"{sri}/10")
 
 # ====================== ВКЛАДКИ ======================
 tab1, tab2, tab3 = st.tabs(["🗺️ Карта & ИИ", "📷 Анализ по фото", "📈 История"])
@@ -148,51 +160,26 @@ with tab1:
 
     with col_map:
         m = folium.Map(location=lake["coords"], zoom_start=5, tiles="CartoDB dark_matter")
-
         for name, info in LAKES_DB.items():
-            is_target = (name == selected_name)
-            color = "#22c55e" if sri > 7 else "#f59e0b" if sri > 4 else "#ef4444"
-
-            folium.CircleMarker(
-                location=info["coords"],
-                radius=14 if is_target else 8,
-                color=color if is_target else "#00ffff",
-                fill=True,
-                fillOpacity=0.8,
-                popup=f"{name}<br>SRI: {sri}<br>{status_text}"
-            ).add_to(m)
-
+            folium.CircleMarker(location=info["coords"], radius=8, color="#38bdf8", fill=True).add_to(m)
         st_folium(m, width="100%", height=480)
 
     with col_ai:
-        if st.button("🚀 Запустить диагностику", type="primary", use_container_width=True):
-            with st.spinner("🤖 Анализ..."):
-                report = "AI анализ работает"
-                st.markdown(f"""
-                <div style="
-                background:#1f2937;
-                padding:15px;
-                border-radius:10px;
-                border-left:4px solid #6366f1;
-                ">
-                {report}
-                </div>
-                """, unsafe_allow_html=True)
+        st.subheader("🤖 ИИ-Анализ")
+        if st.button("🚀 Запустить диагностику"):
+            with st.spinner("Анализ..."):
+                st.markdown("<div class='ai-box'>AI анализ завершён</div>", unsafe_allow_html=True)
 
-        fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=sri,
-            title={"text": "Состояние водоёма"},
-            gauge={'axis': {'range': [0, 10]},
-                   'bar': {'color': "#00f2fe"}}
-        ))
+        fig = go.Figure(go.Indicator(mode="gauge+number", value=sri))
         fig.update_layout(template="plotly_dark")
         st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
-    st.info("Здесь будет анализ фото (без изменений)")
+    st.subheader("📷 Анализ по фото")
+    st.info("Без изменений")
 
 with tab3:
-    st.info("История сохраняется (без изменений)")
+    st.subheader("📈 История")
+    st.info("Без изменений")
 
-st.caption("SuVision Global AI • Дизайн обновлён 💧")
+st.caption("SuVision Global AI • clean UI")
