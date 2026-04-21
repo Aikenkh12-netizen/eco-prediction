@@ -175,7 +175,7 @@ with st.sidebar:
     
     col_p, col_b = st.columns(2)
     with col_p:
-        com_port = st.text_input("COM-порт", value="COM3", help="COM3 / COM4 / COM5 (Windows) или /dev/ttyUSB0 (Linux/Mac)")
+        com_port = st.text_input("COM-порт", value="COM5")
     with col_b:
         baud_rate = st.selectbox("Скорость (baud)", [9600, 115200], index=0)
     
