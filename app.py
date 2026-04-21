@@ -6,7 +6,7 @@ import requests
 from datetime import datetime
 import pandas as pd
 import base64
-import serial  # ← новый импорт
+import serial as pyserial  # ← новый импорт
 import time
 
 # ====================== КОНФИГУРАЦИЯ ======================
