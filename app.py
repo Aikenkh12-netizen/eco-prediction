@@ -6,6 +6,8 @@ import requests
 from datetime import datetime
 import pandas as pd
 import base64
+import serial
+import time
 
 # ====================== КОНФИГУРАЦИЯ ======================
 st.set_page_config(
@@ -18,127 +20,29 @@ st.set_page_config(
 # ====================== КАСТОМНЫЙ ДИЗАЙН ======================
 st.markdown("""
 <style>
-    /* ====================== ГЛОБАЛЬНАЯ ТЕМА ====================== */
-    .stApp {
-        background: linear-gradient(180deg, #0a1428 0%, #0f253f 100%);
-        color: #e0f7ff;
-    }
-    
-    .main .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 3rem;
-        max-width: 1400px;
-    }
-
-    /* ====================== ЗАГОЛОВОК ====================== */
+    .stApp { background: linear-gradient(180deg, #0a1428 0%, #0f253f 100%); color: #e0f7ff; }
+    .main .block-container { padding-top: 1.5rem; padding-bottom: 3rem; max-width: 1400px; }
     .main-header {
         background: linear-gradient(90deg, #00d4ff, #0099cc);
-        color: white;
-        padding: 2rem 2.5rem;
-        border-radius: 24px;
-        text-align: center;
-        margin-bottom: 2rem;
-        box-shadow: 0 15px 35px rgba(0, 212, 255, 0.25);
-        position: relative;
-        overflow: hidden;
+        color: white; padding: 2rem 2.5rem; border-radius: 24px;
+        text-align: center; margin-bottom: 2rem; box-shadow: 0 15px 35px rgba(0, 212, 255, 0.25);
     }
-    .main-header::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 40%;
-        height: 300%;
-        background: linear-gradient(120deg, transparent, rgba(255,255,255,0.3), transparent);
-        transform: skewX(-25deg);
-        animation: shine 6s linear infinite;
-    }
-    @keyframes shine {
-        100% { transform: translateX(200%); }
-    }
-
-    /* ====================== СТАТУС ====================== */
     .status-container {
-        background: rgba(255,255,255,0.08);
-        backdrop-filter: blur(12px);
-        border-radius: 20px;
-        padding: 18px 24px;
-        margin-bottom: 2rem;
-        border: 1px solid rgba(255,255,255,0.1);
-        display: flex;
-        align-items: center;
+        background: rgba(255,255,255,0.08); backdrop-filter: blur(12px);
+        border-radius: 20px; padding: 18px 24px; margin-bottom: 2rem;
+        border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center;
         justify-content: space-between;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     }
-
-    /* ====================== МЕТРИКИ ====================== */
-    .stMetric {
-        background: rgba(255,255,255,0.09) !important;
-        border-radius: 18px !important;
-        padding: 14px 18px !important;
-        border: 1px solid rgba(0, 212, 255, 0.15) !important;
-        box-shadow: 0 6px 20px rgba(0, 212, 255, 0.1) !important;
-        transition: transform 0.2s ease;
-    }
-    .stMetric:hover {
-        transform: translateY(-3px);
-    }
-    .stMetric label {
-        color: #a0d8ff !important;
-        font-size: 0.95rem !important;
-    }
-    .stMetric .metric-value {
-        color: #00f2fe !important;
-        font-size: 1.65rem !important;
-        font-weight: 700;
-    }
-
-    /* ====================== КНОПКИ ====================== */
-    .stButton button {
-        background: linear-gradient(90deg, #00d4ff, #00aaff) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 16px !important;
-        height: 52px !important;
-        font-weight: 700 !important;
-        font-size: 1.05rem !important;
-        box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3) !important;
-        transition: all 0.3s ease !important;
-    }
-    .stButton button:hover {
-        transform: translateY(-3px) scale(1.03);
-        box-shadow: 0 12px 28px rgba(0, 212, 255, 0.45) !important;
-    }
-
-    /* ====================== САЙДБАР ====================== */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0a1f35, #0f2a45) !important;
-        border-right: 4px solid #00d4ff;
-    }
-
-    /* ====================== ТАБЫ ====================== */
-    .stTabs [data-baseweb="tab-list"] {
-        background: rgba(255,255,255,0.06);
-        border-radius: 20px;
-        padding: 6px;
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 16px !important;
-        padding: 12px 24px !important;
-        font-weight: 600;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background: linear-gradient(90deg, #00d4ff, #00aaff) !important;
-        color: white !important;
-        box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
-    }
+    .stMetric { background: rgba(255,255,255,0.09) !important; border-radius: 18px !important;
+        padding: 14px 18px !important; border: 1px solid rgba(0, 212, 255, 0.15) !important; }
+    .stButton button { background: linear-gradient(90deg, #00d4ff, #00aaff) !important;
+        color: white !important; border-radius: 16px !important; height: 52px !important; font-weight: 700 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 GROQ_API_KEY = "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"
 
-# ====================== БАЗА ДАННЫХ (16 водоёмов) ======================
+# ====================== БАЗА ДАННЫХ ======================
 LAKES_DB = {
     "Каспийское море": {"coords": [43.6500, 51.1500], "type": "Морской", "risk": "Нефтяные загрязнения"},
     "Озеро Балхаш": {"coords": [46.5400, 74.8700], "type": "Бессточный", "risk": "Тяжелые металлы и усыхание"},
@@ -158,11 +62,8 @@ LAKES_DB = {
     "Озеро Тузколь": {"coords": [43.0000, 74.5000], "type": "Соленое", "risk": "Минерализация"}
 }
 
-# ====================== СОХРАНЕНИЕ ПАРАМЕТРОВ ======================
 if 'lake_params' not in st.session_state:
-    st.session_state.lake_params = {
-        name: {"ph": 7.2, "temp": 18.0, "turb": 4.0} for name in LAKES_DB.keys()
-    }
+    st.session_state.lake_params = {name: {"ph": 7.2, "temp": 18.0, "turb": 4.0} for name in LAKES_DB.keys()}
 
 # ====================== БОКОВАЯ ПАНЕЛЬ ======================
 with st.sidebar:
@@ -171,17 +72,62 @@ with st.sidebar:
     lake = LAKES_DB[selected_name]
     st.divider()
     st.header("🔹 Параметры воды")
-    current = st.session_state.lake_params[selected_name]
-    ph = st.slider("pH", 0.0, 14.0, current["ph"], 0.1)
-    temp = st.slider("Температура (°C)", 0.0, 40.0, current["temp"], 0.5)
-    turb = st.slider("Мутность (NTU)", 0.0, 100.0, current["turb"], 1.0)
-    if st.button("🔄 Симулировать новые измерения", use_container_width=True):
-        st.rerun()
-    st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
+
+    # ==================== ARDUINO РЕАЛ-ТАЙМ ====================
+    arduino_enabled = st.toggle("📡 Включить Arduino Uno (реал-тайм)", value=False, key="arduino_toggle")
+
+    if arduino_enabled:
+        com_port = st.selectbox("COM-порт", ["COM5", "COM4", "COM3", "COM6", "COM7", "COM8"], index=0)
+        
+        if 'arduino_serial' not in st.session_state:
+            st.session_state.arduino_serial = None
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔌 Подключить", use_container_width=True):
+                try:
+                    st.session_state.arduino_serial = serial.Serial(com_port, 115200, timeout=1)
+                    st.success("✅ Arduino подключён")
+                except Exception as e:
+                    st.error(f"Ошибка: {e}")
+        with col2:
+            if st.button("⛔ Отключить", use_container_width=True):
+                if st.session_state.arduino_serial:
+                    st.session_state.arduino_serial.close()
+                    st.session_state.arduino_serial = None
+                    st.warning("Arduino отключён")
+
+    # Читаем данные с Arduino если включён
+    if arduino_enabled and st.session_state.get('arduino_serial'):
+        st.info("📡 Читаем данные с Arduino...")
+        try:
+            line = st.session_state.arduino_serial.readline().decode('utf-8').strip()
+            if line and "," in line:
+                ph_str, turb_str, ntu_str, temp_str = line.split(",")
+                ph = float(ph_str)
+                turb = float(ntu_str)
+                temp = float(temp_str)
+                st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
+        except:
+            pass
+    else:
+        # Обычные слайдеры
+        current = st.session_state.lake_params[selected_name]
+        ph = st.slider("pH", 0.0, 14.0, current["ph"], 0.1)
+        temp = st.slider("Температура (°C)", 0.0, 40.0, current["temp"], 0.5)
+        turb = st.slider("Мутность (NTU)", 0.0, 100.0, current["turb"], 1.0)
+        st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
+
+# ====================== ОСНОВНЫЕ ПЕРЕМЕННЫЕ ======================
+current = st.session_state.lake_params[selected_name]
+ph = current["ph"]
+temp = current["temp"]
+turb = current["turb"]
 
 # ====================== РАСЧЁТЫ ======================
 def calculate_sri(p, t, tr):
     return max(round(10 - (abs(p-7)*1.5 + (t/10)*0.8 + (tr/20)*1.2), 2), 0.0)
+
 sri = calculate_sri(ph, temp, turb)
 
 def get_status(ph_val, temp_val, turb_val):
@@ -190,9 +136,10 @@ def get_status(ph_val, temp_val, turb_val):
     elif turb_val > 5 or abs(ph_val - 7) > 1 or temp_val > 25:
         return "🟠 Внимание", "warning"
     return "🟢 Норма", "normal"
+
 status_text, status_type = get_status(ph, temp, turb)
 
-# ====================== Groq функции (без изменений) ======================
+# ====================== GROQ ФУНКЦИИ ======================
 def get_ai_report(lake_name, ph, temp, turb, sri, risk):
     url = "https://api.groq.com/openai/v1/chat/completions"
     prompt = f"""Ты опытный эколог-гидролог. Кратко проанализируй состояние водоёма.
@@ -240,25 +187,23 @@ def analyze_photo_with_groq(image_file, lake_name):
     }
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     try:
-        with st.spinner("🤖 Groq Vision анализирует фото... (может занять 4–10 секунд)"):
+        with st.spinner("🤖 Groq Vision анализирует фото..."):
             response = requests.post(url, json=payload, headers=headers, timeout=30)
             if response.status_code == 200:
                 return response.json()['choices'][0]['message']['content'].strip()
             else:
-                return f"Ошибка Groq Vision ({response.status_code}): {response.text[:300]}"
-    except requests.exceptions.Timeout:
-        return "⏳ Таймаут. Попробуй фото меньшего размера или позже."
+                return f"Ошибка Groq Vision ({response.status_code})"
     except Exception as e:
         return f"Ошибка анализа фото: {str(e)}"
 
 # ====================== ОСНОВНОЙ ИНТЕРФЕЙС ======================
-st.markdown('<div class="main-header"><h1 style="margin:0;font-size:3em;font-weight:800;">🌊 SuVision Global AI</h1><p style="margin:8px 0 0 0;font-size:1.35em;opacity:0.95;">Глобальный мониторинг водоёмов Казахстана • Работает на Groq</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1 style="margin:0;font-size:3em;font-weight:800;">🌊 SuVision Global AI</h1><p style="margin:8px 0 0 0;font-size:1.35em;opacity:0.95;">Глобальный мониторинг водоёмов Казахстана • Arduino + Groq</p></div>', unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class="status-container">
     <div style="font-size:1.4em;font-weight:700;">Объект: <span style="color:#00f2fe;font-family:monospace">{selected_name}</span></div>
     <div style="font-size:1.1em;">Основной риск: <strong>{lake['risk']}</strong></div>
-    <div style="background:{'#ff4444' if status_text=='🔴 Опасно' else '#ffaa00' if status_text=='🟠 Внимание' else '#00cc66'}; color:white; padding:10px 26px; border-radius:50px; font-size:1.45em; font-weight:800; box-shadow:0 4px 15px rgba(0,0,0,0.25);">{status_text}</div>
+    <div style="background:{'#ff4444' if status_text=='🔴 Опасно' else '#ffaa00' if status_text=='🟠 Внимание' else '#00cc66'}; color:white; padding:10px 26px; border-radius:50px; font-size:1.45em; font-weight:800;">{status_text}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -289,32 +234,22 @@ with tab1:
                 popup=f"{name}<br>SRI: {sri}<br>{status_text}"
             ).add_to(m)
         st_folium(m, width="100%", height=520)
-
     with col_ai:
         st.subheader("🤖 ИИ-Анализ (Groq)")
         if st.button("🚀 Запустить диагностику", type="primary", use_container_width=True):
-            with st.spinner("Анализирую данные..."):
+            with st.spinner("Анализирую..."):
                 report = get_ai_report(selected_name, ph, temp, turb, sri, lake['risk'])
                 st.success("Анализ завершён")
                 st.info(report)
         
-        # Улучшенный gauge
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=sri,
             title={"text": "Состояние водоёма", "font": {"size": 22, "color": "#e0f7ff"}},
-            gauge={
-                'axis': {'range': [0, 10], 'tickcolor': "#e0f7ff"},
-                'bar': {'color': "#00f2fe"},
-                'steps': [
-                    {'range': [0, 4], 'color': "#ff4444"},
-                    {'range': [4, 7], 'color': "#ffaa00"},
-                    {'range': [7, 10], 'color': "#00cc88"}
-                ],
-                'bgcolor': "rgba(255,255,255,0.05)"
-            }
+            gauge={'axis': {'range': [0, 10]}, 'bar': {'color': "#00f2fe"},
+                   'steps': [{'range': [0, 4], 'color': "#ff4444"}, {'range': [4, 7], 'color': "#ffaa00"}, {'range': [7, 10], 'color': "#00cc88"}]}
         ))
-        fig.update_layout(height=300, paper_bgcolor="rgba(0,0,0,0)", font={'color': "#e0f7ff"}, margin=dict(l=20, r=20, t=30, b=10))
+        fig.update_layout(height=300, paper_bgcolor="rgba(0,0,0,0)", font={'color': "#e0f7ff"})
         st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
@@ -326,7 +261,7 @@ with tab2:
         st.image(photo, caption="Фото для анализа", use_container_width=True)
         if st.button("🔍 Запустить профессиональный анализ фото", type="primary"):
             analysis = analyze_photo_with_groq(photo, selected_name)
-            st.success("✅ Анализ фото завершён")
+            st.success("✅ Анализ завершён")
             st.markdown(analysis)
 
 with tab3:
@@ -349,4 +284,4 @@ with tab3:
     else:
         st.info("Пока нет сохранённых измерений.")
 
-st.caption("SuVision Global AI • Работает на Groq • Параметры сохраняются отдельно для каждого водоёма 💧")
+st.caption("SuVision Global AI • Реал-тайм данные с Arduino Uno + Groq Vision 💧")
