@@ -8,8 +8,7 @@ import pandas as pd
 import base64
 import serial
 import time
-import os  # ← добавлен для определения ОС (Windows / Linux)
-
+import os # ← добавлен для определения ОС (Windows / Linux)
 # ====================== КОНФИГУРАЦИЯ ======================
 st.set_page_config(
     page_title="SuVision Global AI",
@@ -17,7 +16,6 @@ st.set_page_config(
     page_icon="🌊",
     initial_sidebar_state="expanded"
 )
-
 # ====================== КАСТОМНЫЙ ДИЗАЙН ======================
 st.markdown("""
 <style>
@@ -26,7 +24,7 @@ st.markdown("""
         background: linear-gradient(180deg, #0a1428 0%, #0f253f 100%);
         color: #e0f7ff;
     }
-   
+  
     .main .block-container {
         padding-top: 1.5rem;
         padding-bottom: 3rem;
@@ -115,9 +113,7 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
 GROQ_API_KEY = "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"
-
 # ====================== БАЗА ДАННЫХ ======================
 LAKES_DB = {
     "Каспийское море": {"coords": [43.6500, 51.1500], "type": "Морской", "risk": "Нефтяные загрязнения"},
@@ -137,7 +133,6 @@ LAKES_DB = {
     "Малое Аральское море": {"coords": [46.0000, 59.5000], "type": "Соленое", "risk": "Усыхание и экокатастрофа"},
     "Озеро Тузколь": {"coords": [43.0000, 74.5000], "type": "Соленое", "risk": "Минерализация"}
 }
-
 # ====================== СОХРАНЕНИЕ ПАРАМЕТРОВ ======================
 if 'lake_params' not in st.session_state:
     st.session_state.lake_params = {
@@ -145,7 +140,8 @@ if 'lake_params' not in st.session_state:
     }
 if 'ser' not in st.session_state:
     st.session_state.ser = None
-
+if 'live_mode' not in st.session_state:
+    st.session_state.live_mode = False
 # ====================== БОКОВАЯ ПАНЕЛЬ ======================
 with st.sidebar:
     st.title("🚀 SuVision Core")
@@ -153,21 +149,20 @@ with st.sidebar:
     lake = LAKES_DB[selected_name]
     st.divider()
     st.header("🔹 Параметры воды")
-   
+  
     current = st.session_state.lake_params[selected_name]
-   
+  
     ph = st.slider("pH", 0.0, 14.0, current["ph"], 0.1)
     temp = st.slider("Температура (°C)", 0.0, 40.0, current["temp"], 0.5)
     turb = st.slider("Мутность (NTU)", 0.0, 100.0, current["turb"], 1.0)
-   
+  
     if st.button("🔄 Симулировать новые измерения", use_container_width=True):
         st.rerun()
     st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
-
     # ====================== ОБНОВЛЁННАЯ СЕКЦИЯ ARDUINO ======================
     st.divider()
     st.subheader("🔌 Arduino Uno (датчики)")
-   
+  
     col_p, col_b = st.columns(2)
     with col_p:
         # Автоматический выбор дефолтного порта в зависимости от ОС
@@ -175,7 +170,7 @@ with st.sidebar:
         com_port = st.text_input("COM-порт / tty", value=default_port)
     with col_b:
         baud_rate = st.selectbox("Скорость (baud)", [9600, 115200], index=0)
-   
+  
     if st.button("🔌 Подключить Arduino", use_container_width=True, type="primary"):
         try:
             if st.session_state.ser is None or not st.session_state.ser.is_open:
@@ -185,11 +180,10 @@ with st.sidebar:
         except Exception as e:
             st.error(f"❌ Не удалось подключиться к {com_port}")
             st.caption("💡 **Подсказка**: Запусти приложение **локально** (`streamlit run app.py`) и подключи Arduino. В облаке (Streamlit Cloud и т.п.) COM-порты недоступны.")
-
     # Если Arduino подключён
     if st.session_state.ser and st.session_state.ser.is_open:
         st.markdown('<div class="arduino-connected">🟢 Arduino подключён • Данные поступают</div>', unsafe_allow_html=True)
-       
+      
         if st.button("📡 Прочитать данные с датчиков СЕЙЧАС", use_container_width=True, type="primary"):
             try:
                 line = st.session_state.ser.readline().decode('utf-8').strip()
@@ -199,7 +193,7 @@ with st.sidebar:
                         if ":" in item:
                             k, v = item.split(":")
                             data[k.strip().lower()] = float(v.strip())
-                   
+                  
                     st.session_state.lake_params[selected_name] = {
                         "ph": round(data.get("ph", ph), 2),
                         "temp": round(data.get("temp", temp), 1),
@@ -211,30 +205,31 @@ with st.sidebar:
                     st.warning("⚠️ Данные не распознаны. Проверьте формат в скетче Arduino")
             except Exception as e:
                 st.error(f"Ошибка чтения: {e}")
-       
+      
         if st.button("🔌 Отключить Arduino", use_container_width=True):
             st.session_state.ser.close()
             st.session_state.ser = None
             st.success("Arduino отключён")
             st.rerun()
 
+        # ←←← НОВЫЙ БЛОК: non-stop поток данных
+        live_mode = st.checkbox("🔴 Включить non-stop поток данных с Arduino (автообновление каждые 5 сек)", 
+                                value=st.session_state.live_mode, 
+                                key="live_mode_checkbox")
+        st.session_state.live_mode = live_mode
+      
     st.caption("Ожидаемый формат от Arduino:\n`ph:7.45,temp:23.1,turb:4.2`")
-
 # ====================== РАСЧЁТЫ ======================
 def calculate_sri(p, t, tr):
     return max(round(10 - (abs(p-7)*1.5 + (t/10)*0.8 + (tr/20)*1.2), 2), 0.0)
-
 sri = calculate_sri(ph, temp, turb)
-
 def get_status(ph_val, temp_val, turb_val):
     if not (6.5 <= ph_val <= 8.5) or turb_val > 10 or temp_val > 30:
         return "🔴 Опасно", "error"
     elif turb_val > 5 or abs(ph_val - 7) > 1 or temp_val > 25:
         return "🟠 Внимание", "warning"
     return "🟢 Норма", "normal"
-
 status_text, status_type = get_status(ph, temp, turb)
-
 # ====================== Groq функции ======================
 def get_ai_report(lake_name, ph, temp, turb, sri, risk):
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -255,6 +250,33 @@ SRI: {sri}/10
         return f"Ошибка Groq ({response.status_code})"
     except Exception as e:
         return f"Ошибка подключения: {str(e)}"
+
+def get_ai_forecast(lake_name, ph, temp, turb, sri, risk, history=None):
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    history_str = ""
+    if history and len(history) > 0:
+        history_str = "Последние измерения: " + ", ".join([f"{h['Время']}: pH={h['pH']}, T={h['Температура']}, Turb={h['Мутность']}" for h in history[-3:]])
+    prompt = f"""Ты опытный эколог-гидролог, специализирующийся на водоёмах Казахстана.
+
+Анализируй текущие данные и сделай прогноз риска загрязнения или цветения (эвтрофикации) водоёма.
+
+Объект: {lake_name}
+Параметры сейчас: pH = {ph}, температура = {temp}°C, мутность = {turb} NTU, SRI = {sri}/10
+Основной риск: {risk}
+{history_str}
+
+Ответь **ровно двумя предложениями** на русском языке:
+1. Краткий прогноз на 3–7 дней (низкий/средний/высокий риск загрязнения или цветения водорослей).
+2. Действия: если риск высокий — **ПРЕДУПРЕЖДЕНИЕ** с рекомендациями."""
+    payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "max_tokens": 200, "temperature": 0.6}
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=12)
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content'].strip()
+        return f"Ошибка Groq ({response.status_code})"
+    except Exception as e:
+        return f"Ошибка прогноза: {str(e)}"
 
 def analyze_photo_with_groq(image_file, lake_name):
     if image_file is None:
@@ -286,10 +308,8 @@ def analyze_photo_with_groq(image_file, lake_name):
                 return f"Ошибка Groq Vision ({response.status_code})"
     except Exception as e:
         return f"Ошибка анализа фото: {str(e)}"
-
 # ====================== ОСНОВНОЙ ИНТЕРФЕЙС ======================
 st.markdown('<div class="main-header"><h1 style="margin:0;font-size:3em;font-weight:800;">🌊 SuVision Global AI</h1><p style="margin:8px 0 0 0;font-size:1.35em;opacity:0.95;">Глобальный мониторинг водоёмов Казахстана • Работает на Groq</p></div>', unsafe_allow_html=True)
-
 st.markdown(f"""
 <div class="status-container">
     <div style="font-size:1.4em;font-weight:700;">Объект: <span style="color:#00f2fe;font-family:monospace">{selected_name}</span></div>
@@ -297,15 +317,12 @@ st.markdown(f"""
     <div style="background:{'#ff4444' if status_text=='🔴 Опасно' else '#ffaa00' if status_text=='🟠 Внимание' else '#00cc66'}; color:white; padding:10px 26px; border-radius:50px; font-size:1.45em; font-weight:800; box-shadow:0 4px 15px rgba(0,0,0,0.25);">{status_text}</div>
 </div>
 """, unsafe_allow_html=True)
-
 col1, col2, col3, col4 = st.columns(4)
 with col1: st.metric("pH", f"{ph:.2f}")
 with col2: st.metric("Температура", f"{temp:.1f} °C")
 with col3: st.metric("Мутность", f"{turb:.1f} NTU")
 with col4: st.metric("Индекс SRI", f"{sri}/10", delta=round(sri - 7.0, 2))
-
 tab1, tab2, tab3 = st.tabs(["🗺️ Карта & ИИ", "📷 Анализ по фото", "📈 История"])
-
 with tab1:
     col_map, col_ai = st.columns([2.2, 1])
     with col_map:
@@ -334,6 +351,23 @@ with tab1:
         fig.update_layout(height=300, paper_bgcolor="rgba(0,0,0,0)", font={'color': "#e0f7ff"}, margin=dict(l=20,r=20,t=30,b=10))
         st.plotly_chart(fig, use_container_width=True)
 
+        # ←←← НОВЫЙ БЛОК: прогноз загрязнения и цветения
+        st.subheader("🔮 ИИ-Прогноз загрязнения и цветения")
+        if st.button("🚀 Запустить прогноз на 7 дней", type="primary", use_container_width=True):
+            with st.spinner("Прогнозирую..."):
+                forecast = get_ai_forecast(
+                    selected_name, 
+                    ph, 
+                    temp, 
+                    turb, 
+                    sri, 
+                    lake['risk'], 
+                    st.session_state.history if 'history' in st.session_state else None
+                )
+                st.success("Прогноз готов")
+                st.info(forecast)
+                if "ПРЕДУПРЕЖДЕНИЕ" in forecast or "высокий риск" in forecast.lower() or "цветение" in forecast.lower():
+                    st.error("⚠️ ВЫСОКИЙ РИСК! Срочно проверьте водоём!")
 with tab2:
     st.subheader("📷 Анализ качества воды по фотографии")
     uploaded_file = st.file_uploader("Загрузите фото воды", type=["jpg", "jpeg", "png"])
@@ -345,7 +379,6 @@ with tab2:
             analysis = analyze_photo_with_groq(photo, selected_name)
             st.success("✅ Анализ фото завершён")
             st.markdown(analysis)
-
 with tab3:
     st.subheader("📈 История измерений")
     if 'history' not in st.session_state:
@@ -361,5 +394,25 @@ with tab3:
         st.dataframe(df, use_container_width=True)
     else:
         st.info("Пока нет сохранённых измерений.")
-
 st.caption("SuVision Global AI • Работает на Groq + Arduino Uno • Параметры сохраняются отдельно для каждого водоёма 💧")
+
+# ====================== НЕПРЕРЫВНЫЙ ПОТОК ДАННЫХ ======================
+if st.session_state.get("live_mode", False) and st.session_state.get('ser') and st.session_state.ser and st.session_state.ser.is_open:
+    try:
+        line = st.session_state.ser.readline().decode('utf-8').strip()
+        if line and "ph:" in line and "temp:" in line and "turb:" in line:
+            data = {}
+            for item in line.split(","):
+                if ":" in item:
+                    k, v = item.split(":")
+                    data[k.strip().lower()] = float(v.strip())
+            st.session_state.lake_params[selected_name] = {
+                "ph": round(data.get("ph", ph), 2),
+                "temp": round(data.get("temp", temp), 1),
+                "turb": round(data.get("turb", turb), 1)
+            }
+            st.toast("📡 Non-stop: новые данные с датчиков!", icon="📡")
+    except:
+        pass
+    time.sleep(5)
+    st.rerun()
