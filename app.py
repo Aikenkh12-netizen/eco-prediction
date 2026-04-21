@@ -252,4 +252,4 @@ with tab3:
     else:
         st.info("Пока нет сохранённых измерений.")
 
-st.caption("SuVision Global AI • Мониторинг водоёмов Казахстана 💧") как можно улушить дизайн
+st.caption("SuVision Global AI • Мониторинг водоёмов Казахстана 💧")
