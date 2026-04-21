@@ -182,7 +182,7 @@ with st.sidebar:
     if st.button("🔌 Подключить Arduino", use_container_width=True, type="primary"):
         try:
             if st.session_state.ser is None or not st.session_state.ser.is_open:
-                st.session_state.ser = serial.Serial(com_port, baud_rate, timeout=1.5)
+                st.session_state.ser = pyserial.Serial(com_port, baud_rate, timeout=1.5)
                 st.success(f"✅ Подключено к {com_port}")
                 st.rerun()
         except Exception as e:
