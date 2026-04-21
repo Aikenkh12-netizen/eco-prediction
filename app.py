@@ -6,6 +6,8 @@ import requests
 from datetime import datetime
 import pandas as pd
 import base64
+import serial  # ← новый импорт
+import time
 
 # ====================== КОНФИГУРАЦИЯ ======================
 st.set_page_config(
@@ -115,30 +117,12 @@ st.markdown("""
         background: linear-gradient(180deg, #0a1f35, #0f2a45) !important;
         border-right: 4px solid #00d4ff;
     }
-
-    /* ====================== ТАБЫ ====================== */
-    .stTabs [data-baseweb="tab-list"] {
-        background: rgba(255,255,255,0.06);
-        border-radius: 20px;
-        padding: 6px;
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 16px !important;
-        padding: 12px 24px !important;
-        font-weight: 600;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background: linear-gradient(90deg, #00d4ff, #00aaff) !important;
-        color: white !important;
-        box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
-    }
 </style>
 """, unsafe_allow_html=True)
 
 GROQ_API_KEY = "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"
 
-# ====================== БАЗА ДАННЫХ (16 водоёмов) ======================
+# ====================== БАЗА ДАННЫХ ======================
 LAKES_DB = {
     "Каспийское море": {"coords": [43.6500, 51.1500], "type": "Морской", "risk": "Нефтяные загрязнения"},
     "Озеро Балхаш": {"coords": [46.5400, 74.8700], "type": "Бессточный", "risk": "Тяжелые металлы и усыхание"},
@@ -163,6 +147,8 @@ if 'lake_params' not in st.session_state:
     st.session_state.lake_params = {
         name: {"ph": 7.2, "temp": 18.0, "turb": 4.0} for name in LAKES_DB.keys()
     }
+if 'ser' not in st.session_state:
+    st.session_state.ser = None
 
 # ====================== БОКОВАЯ ПАНЕЛЬ ======================
 with st.sidebar:
@@ -171,15 +157,72 @@ with st.sidebar:
     lake = LAKES_DB[selected_name]
     st.divider()
     st.header("🔹 Параметры воды")
+    
     current = st.session_state.lake_params[selected_name]
+    
     ph = st.slider("pH", 0.0, 14.0, current["ph"], 0.1)
     temp = st.slider("Температура (°C)", 0.0, 40.0, current["temp"], 0.5)
     turb = st.slider("Мутность (NTU)", 0.0, 100.0, current["turb"], 1.0)
+    
     if st.button("🔄 Симулировать новые измерения", use_container_width=True):
         st.rerun()
+
     st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
 
-# ====================== РАСЧЁТЫ ======================
+    # ====================== НОВАЯ СЕКЦИЯ ARDUINO ======================
+    st.divider()
+    st.subheader("🔌 Arduino Uno (датчики)")
+    
+    col_p, col_b = st.columns(2)
+    with col_p:
+        com_port = st.text_input("COM-порт", value="COM3", help="COM3 / COM4 / COM5 (Windows) или /dev/ttyUSB0 (Linux/Mac)")
+    with col_b:
+        baud_rate = st.selectbox("Скорость (baud)", [9600, 115200], index=0)
+    
+    if st.button("🔌 Подключить Arduino", use_container_width=True, type="primary"):
+        try:
+            if st.session_state.ser is None or not st.session_state.ser.is_open:
+                st.session_state.ser = serial.Serial(com_port, baud_rate, timeout=1.5)
+                st.success(f"✅ Подключено к {com_port}")
+                st.rerun()
+        except Exception as e:
+            st.error(f"❌ Ошибка подключения: {e}")
+    
+    # Если Arduino подключён
+    if st.session_state.ser and st.session_state.ser.is_open:
+        st.markdown('<div class="arduino-connected">🟢 Arduino подключён • Данные поступают</div>', unsafe_allow_html=True)
+        
+        if st.button("📡 Прочитать данные с датчиков СЕЙЧАС", use_container_width=True, type="primary"):
+            try:
+                line = st.session_state.ser.readline().decode('utf-8').strip()
+                if line and "ph:" in line and "temp:" in line and "turb:" in line:
+                    data = {}
+                    for item in line.split(","):
+                        if ":" in item:
+                            k, v = item.split(":")
+                            data[k.strip().lower()] = float(v.strip())
+                    
+                    st.session_state.lake_params[selected_name] = {
+                        "ph": round(data.get("ph", ph), 2),
+                        "temp": round(data.get("temp", temp), 1),
+                        "turb": round(data.get("turb", turb), 1)
+                    }
+                    st.toast("✅ Данные с Arduino успешно получены!", icon="📡")
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Данные не распознаны. Проверьте формат в скетче Arduino")
+            except Exception as e:
+                st.error(f"Ошибка чтения: {e}")
+        
+        if st.button("🔌 Отключить Arduino", use_container_width=True):
+            st.session_state.ser.close()
+            st.session_state.ser = None
+            st.success("Arduino отключён")
+            st.rerun()
+
+    st.caption("Ожидаемый формат от Arduino:\n`ph:7.45,temp:23.1,turb:4.2`")
+
+# ====================== РАСЧЁТЫ (без изменений) ======================
 def calculate_sri(p, t, tr):
     return max(round(10 - (abs(p-7)*1.5 + (t/10)*0.8 + (tr/20)*1.2), 2), 0.0)
 sri = calculate_sri(ph, temp, turb)
@@ -203,12 +246,7 @@ SRI: {sri}/10
 Ответь ровно двумя предложениями на русском:
 1. Оценка текущего состояния.
 2. Главная рекомендация."""
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 180,
-        "temperature": 0.65
-    }
+    payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "max_tokens": 180, "temperature": 0.65}
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=12)
@@ -240,14 +278,12 @@ def analyze_photo_with_groq(image_file, lake_name):
     }
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     try:
-        with st.spinner("🤖 Groq Vision анализирует фото... (может занять 4–10 секунд)"):
+        with st.spinner("🤖 Groq Vision анализирует фото..."):
             response = requests.post(url, json=payload, headers=headers, timeout=30)
             if response.status_code == 200:
                 return response.json()['choices'][0]['message']['content'].strip()
             else:
-                return f"Ошибка Groq Vision ({response.status_code}): {response.text[:300]}"
-    except requests.exceptions.Timeout:
-        return "⏳ Таймаут. Попробуй фото меньшего размера или позже."
+                return f"Ошибка Groq Vision ({response.status_code})"
     except Exception as e:
         return f"Ошибка анализа фото: {str(e)}"
 
@@ -262,14 +298,12 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Метрики
 col1, col2, col3, col4 = st.columns(4)
 with col1: st.metric("pH", f"{ph:.2f}")
 with col2: st.metric("Температура", f"{temp:.1f} °C")
 with col3: st.metric("Мутность", f"{turb:.1f} NTU")
 with col4: st.metric("Индекс SRI", f"{sri}/10", delta=round(sri - 7.0, 2))
 
-# Вкладки
 tab1, tab2, tab3 = st.tabs(["🗺️ Карта & ИИ", "📷 Анализ по фото", "📈 История"])
 
 with tab1:
@@ -280,14 +314,9 @@ with tab1:
         for name, info in LAKES_DB.items():
             is_target = (name == selected_name)
             color = "green" if sri > 7 else "orange" if sri > 4 else "red"
-            folium.CircleMarker(
-                location=info["coords"],
-                radius=14 if is_target else 8,
-                color=color if is_target else "#00ffff",
-                fill=True,
-                fillOpacity=0.9,
-                popup=f"{name}<br>SRI: {sri}<br>{status_text}"
-            ).add_to(m)
+            folium.CircleMarker(location=info["coords"], radius=14 if is_target else 8,
+                                color=color if is_target else "#00ffff", fill=True, fillOpacity=0.9,
+                                popup=f"{name}<br>SRI: {sri}<br>{status_text}").add_to(m)
         st_folium(m, width="100%", height=520)
 
     with col_ai:
@@ -297,24 +326,13 @@ with tab1:
                 report = get_ai_report(selected_name, ph, temp, turb, sri, lake['risk'])
                 st.success("Анализ завершён")
                 st.info(report)
-        
-        # Улучшенный gauge
         fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=sri,
+            mode="gauge+number", value=sri,
             title={"text": "Состояние водоёма", "font": {"size": 22, "color": "#e0f7ff"}},
-            gauge={
-                'axis': {'range': [0, 10], 'tickcolor': "#e0f7ff"},
-                'bar': {'color': "#00f2fe"},
-                'steps': [
-                    {'range': [0, 4], 'color': "#ff4444"},
-                    {'range': [4, 7], 'color': "#ffaa00"},
-                    {'range': [7, 10], 'color': "#00cc88"}
-                ],
-                'bgcolor': "rgba(255,255,255,0.05)"
-            }
-        ))
-        fig.update_layout(height=300, paper_bgcolor="rgba(0,0,0,0)", font={'color': "#e0f7ff"}, margin=dict(l=20, r=20, t=30, b=10))
+            gauge={'axis': {'range': [0, 10]}, 'bar': {'color': "#00f2fe"},
+                   'steps': [{'range': [0, 4], 'color': "#ff4444"}, {'range': [4, 7], 'color': "#ffaa00"}, {'range': [7, 10], 'color': "#00cc88"}],
+                   'bgcolor': "rgba(255,255,255,0.05)"}))
+        fig.update_layout(height=300, paper_bgcolor="rgba(0,0,0,0)", font={'color': "#e0f7ff"}, margin=dict(l=20,r=20,t=30,b=10))
         st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
@@ -336,11 +354,7 @@ with tab3:
     if st.button("📌 Сохранить текущие показания"):
         st.session_state.history.append({
             "Время": datetime.now().strftime("%H:%M"),
-            "pH": ph,
-            "Температура": temp,
-            "Мутность": turb,
-            "SRI": sri,
-            "Водоём": selected_name
+            "pH": ph, "Температура": temp, "Мутность": turb, "SRI": sri, "Водоём": selected_name
         })
         st.success("Показания сохранены!")
     if st.session_state.history:
@@ -349,4 +363,4 @@ with tab3:
     else:
         st.info("Пока нет сохранённых измерений.")
 
-st.caption("SuVision Global AI • Работает на Groq • Параметры сохраняются отдельно для каждого водоёма 💧")
+st.caption("SuVision Global AI • Работает на Groq + Arduino Uno • Параметры сохраняются отдельно для каждого водоёма 💧")
