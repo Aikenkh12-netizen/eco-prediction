@@ -11,8 +11,130 @@ import base64
 st.set_page_config(
     page_title="SuVision Global AI",
     layout="wide",
-    page_icon="🌊"
+    page_icon="🌊",
+    initial_sidebar_state="expanded"
 )
+
+# ====================== КАСТОМНЫЙ ДИЗАЙН ======================
+st.markdown("""
+<style>
+    /* ====================== ГЛОБАЛЬНАЯ ТЕМА ====================== */
+    .stApp {
+        background: linear-gradient(180deg, #0a1428 0%, #0f253f 100%);
+        color: #e0f7ff;
+    }
+    
+    .main .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+        max-width: 1400px;
+    }
+
+    /* ====================== ЗАГОЛОВОК ====================== */
+    .main-header {
+        background: linear-gradient(90deg, #00d4ff, #0099cc);
+        color: white;
+        padding: 2rem 2.5rem;
+        border-radius: 24px;
+        text-align: center;
+        margin-bottom: 2rem;
+        box-shadow: 0 15px 35px rgba(0, 212, 255, 0.25);
+        position: relative;
+        overflow: hidden;
+    }
+    .main-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 40%;
+        height: 300%;
+        background: linear-gradient(120deg, transparent, rgba(255,255,255,0.3), transparent);
+        transform: skewX(-25deg);
+        animation: shine 6s linear infinite;
+    }
+    @keyframes shine {
+        100% { transform: translateX(200%); }
+    }
+
+    /* ====================== СТАТУС ====================== */
+    .status-container {
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 20px;
+        padding: 18px 24px;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255,255,255,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    /* ====================== МЕТРИКИ ====================== */
+    .stMetric {
+        background: rgba(255,255,255,0.09) !important;
+        border-radius: 18px !important;
+        padding: 14px 18px !important;
+        border: 1px solid rgba(0, 212, 255, 0.15) !important;
+        box-shadow: 0 6px 20px rgba(0, 212, 255, 0.1) !important;
+        transition: transform 0.2s ease;
+    }
+    .stMetric:hover {
+        transform: translateY(-3px);
+    }
+    .stMetric label {
+        color: #a0d8ff !important;
+        font-size: 0.95rem !important;
+    }
+    .stMetric .metric-value {
+        color: #00f2fe !important;
+        font-size: 1.65rem !important;
+        font-weight: 700;
+    }
+
+    /* ====================== КНОПКИ ====================== */
+    .stButton button {
+        background: linear-gradient(90deg, #00d4ff, #00aaff) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 16px !important;
+        height: 52px !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+        box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3) !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton button:hover {
+        transform: translateY(-3px) scale(1.03);
+        box-shadow: 0 12px 28px rgba(0, 212, 255, 0.45) !important;
+    }
+
+    /* ====================== САЙДБАР ====================== */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0a1f35, #0f2a45) !important;
+        border-right: 4px solid #00d4ff;
+    }
+
+    /* ====================== ТАБЫ ====================== */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(255,255,255,0.06);
+        border-radius: 20px;
+        padding: 6px;
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 16px !important;
+        padding: 12px 24px !important;
+        font-weight: 600;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background: linear-gradient(90deg, #00d4ff, #00aaff) !important;
+        color: white !important;
+        box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 GROQ_API_KEY = "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"
 
@@ -36,7 +158,7 @@ LAKES_DB = {
     "Озеро Тузколь": {"coords": [43.0000, 74.5000], "type": "Соленое", "risk": "Минерализация"}
 }
 
-# ====================== СОХРАНЕНИЕ ПАРАМЕТРОВ ДЛЯ КАЖДОГО ВОДОЁМА ======================
+# ====================== СОХРАНЕНИЕ ПАРАМЕТРОВ ======================
 if 'lake_params' not in st.session_state:
     st.session_state.lake_params = {
         name: {"ph": 7.2, "temp": 18.0, "turb": 4.0} for name in LAKES_DB.keys()
@@ -47,27 +169,19 @@ with st.sidebar:
     st.title("🚀 SuVision Core")
     selected_name = st.selectbox("🎯 Станция мониторинга", list(LAKES_DB.keys()))
     lake = LAKES_DB[selected_name]
-  
     st.divider()
     st.header("🔹 Параметры воды")
-    
-    # Загружаем сохранённые параметры текущего водоёма
     current = st.session_state.lake_params[selected_name]
-    
     ph = st.slider("pH", 0.0, 14.0, current["ph"], 0.1)
     temp = st.slider("Температура (°C)", 0.0, 40.0, current["temp"], 0.5)
     turb = st.slider("Мутность (NTU)", 0.0, 100.0, current["turb"], 1.0)
-  
     if st.button("🔄 Симулировать новые измерения", use_container_width=True):
         st.rerun()
-
-    # Сохраняем изменения сразу
     st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
 
 # ====================== РАСЧЁТЫ ======================
 def calculate_sri(p, t, tr):
     return max(round(10 - (abs(p-7)*1.5 + (t/10)*0.8 + (tr/20)*1.2), 2), 0.0)
-
 sri = calculate_sri(ph, temp, turb)
 
 def get_status(ph_val, temp_val, turb_val):
@@ -76,10 +190,9 @@ def get_status(ph_val, temp_val, turb_val):
     elif turb_val > 5 or abs(ph_val - 7) > 1 or temp_val > 25:
         return "🟠 Внимание", "warning"
     return "🟢 Норма", "normal"
-
 status_text, status_type = get_status(ph, temp, turb)
 
-# ====================== Groq функции ======================
+# ====================== Groq функции (без изменений) ======================
 def get_ai_report(lake_name, ph, temp, turb, sri, risk):
     url = "https://api.groq.com/openai/v1/chat/completions"
     prompt = f"""Ты опытный эколог-гидролог. Кратко проанализируй состояние водоёма.
@@ -90,7 +203,6 @@ SRI: {sri}/10
 Ответь ровно двумя предложениями на русском:
 1. Оценка текущего состояния.
 2. Главная рекомендация."""
-
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
@@ -98,7 +210,6 @@ SRI: {sri}/10
         "temperature": 0.65
     }
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-  
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=12)
         if response.status_code == 200:
@@ -110,44 +221,27 @@ SRI: {sri}/10
 def analyze_photo_with_groq(image_file, lake_name):
     if image_file is None:
         return "Нет изображения для анализа."
-   
     image_bytes = image_file.getvalue()
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
-   
     url = "https://api.groq.com/openai/v1/chat/completions"
-   
     prompt = f"""Ты — эксперт-гидролог и эколог по водоёмам Казахстана, особенно {lake_name}.
-   
 Проанализируй это фото воды внимательно:
 - Оценка мутности (низкая / средняя / высокая) + примерное значение в NTU
 - Цвет воды и возможные причины
 - Признаки загрязнения (нефтяная плёнка, водоросли, пена, мусор, масляные пятна, цветение и т.д.)
 - Общая оценка качества воды (1–10)
 - Главная рекомендация, что делать сейчас
-
 Отвечай на русском языке чётко, по делу, используй эмодзи где уместно."""
-
     payload = {
         "model": "meta-llama/llama-4-scout-17b-16e-instruct",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                ]
-            }
-        ],
+        "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}]}],
         "max_tokens": 400,
         "temperature": 0.5
     }
-   
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-   
     try:
         with st.spinner("🤖 Groq Vision анализирует фото... (может занять 4–10 секунд)"):
             response = requests.post(url, json=payload, headers=headers, timeout=30)
-           
             if response.status_code == 200:
                 return response.json()['choices'][0]['message']['content'].strip()
             else:
@@ -158,9 +252,15 @@ def analyze_photo_with_groq(image_file, lake_name):
         return f"Ошибка анализа фото: {str(e)}"
 
 # ====================== ОСНОВНОЙ ИНТЕРФЕЙС ======================
-st.title("🌊 SuVision: Глобальный мониторинг водоёмов")
-st.markdown(f"**Объект:** `{selected_name}` | **Основной риск:** {lake['risk']}")
-st.markdown(f"### Состояние водоёма: **:{status_type}[{status_text}]**")
+st.markdown('<div class="main-header"><h1 style="margin:0;font-size:3em;font-weight:800;">🌊 SuVision Global AI</h1><p style="margin:8px 0 0 0;font-size:1.35em;opacity:0.95;">Глобальный мониторинг водоёмов Казахстана • Работает на Groq</p></div>', unsafe_allow_html=True)
+
+st.markdown(f"""
+<div class="status-container">
+    <div style="font-size:1.4em;font-weight:700;">Объект: <span style="color:#00f2fe;font-family:monospace">{selected_name}</span></div>
+    <div style="font-size:1.1em;">Основной риск: <strong>{lake['risk']}</strong></div>
+    <div style="background:{'#ff4444' if status_text=='🔴 Опасно' else '#ffaa00' if status_text=='🟠 Внимание' else '#00cc66'}; color:white; padding:10px 26px; border-radius:50px; font-size:1.45em; font-weight:800; box-shadow:0 4px 15px rgba(0,0,0,0.25);">{status_text}</div>
+</div>
+""", unsafe_allow_html=True)
 
 # Метрики
 col1, col2, col3, col4 = st.columns(4)
@@ -173,12 +273,10 @@ with col4: st.metric("Индекс SRI", f"{sri}/10", delta=round(sri - 7.0, 2))
 tab1, tab2, tab3 = st.tabs(["🗺️ Карта & ИИ", "📷 Анализ по фото", "📈 История"])
 
 with tab1:
-    col_map, col_ai = st.columns([2, 1])
-   
+    col_map, col_ai = st.columns([2.2, 1])
     with col_map:
         st.subheader("🗺️ Карта мониторинга")
-        m = folium.Map(location=lake["coords"], zoom_start=5, tiles="CartoDB dark_matter")
-       
+        m = folium.Map(location=lake["coords"], zoom_start=6, tiles="CartoDB dark_matter")
         for name, info in LAKES_DB.items():
             is_target = (name == selected_name)
             color = "green" if sri > 7 else "orange" if sri > 4 else "red"
@@ -187,12 +285,11 @@ with tab1:
                 radius=14 if is_target else 8,
                 color=color if is_target else "#00ffff",
                 fill=True,
-                fillOpacity=0.8,
+                fillOpacity=0.9,
                 popup=f"{name}<br>SRI: {sri}<br>{status_text}"
             ).add_to(m)
-       
-        st_folium(m, width="100%", height=480)
-   
+        st_folium(m, width="100%", height=520)
+
     with col_ai:
         st.subheader("🤖 ИИ-Анализ (Groq)")
         if st.button("🚀 Запустить диагностику", type="primary", use_container_width=True):
@@ -200,31 +297,33 @@ with tab1:
                 report = get_ai_report(selected_name, ph, temp, turb, sri, lake['risk'])
                 st.success("Анализ завершён")
                 st.info(report)
-
+        
+        # Улучшенный gauge
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=sri,
-            title={"text": "Состояние водоёма"},
-            gauge={'axis': {'range': [0, 10]},
-                   'bar': {'color': "#00f2fe"},
-                   'steps': [
-                       {'range': [0, 4], 'color': "#440000"},
-                       {'range': [4, 7], 'color': "#663300"},
-                       {'range': [7, 10], 'color': "#003311"}
-                   ]}
+            title={"text": "Состояние водоёма", "font": {"size": 22, "color": "#e0f7ff"}},
+            gauge={
+                'axis': {'range': [0, 10], 'tickcolor': "#e0f7ff"},
+                'bar': {'color': "#00f2fe"},
+                'steps': [
+                    {'range': [0, 4], 'color': "#ff4444"},
+                    {'range': [4, 7], 'color': "#ffaa00"},
+                    {'range': [7, 10], 'color': "#00cc88"}
+                ],
+                'bgcolor': "rgba(255,255,255,0.05)"
+            }
         ))
-        fig.update_layout(height=260, paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+        fig.update_layout(height=300, paper_bgcolor="rgba(0,0,0,0)", font={'color': "#e0f7ff"}, margin=dict(l=20, r=20, t=30, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
     st.subheader("📷 Анализ качества воды по фотографии")
     uploaded_file = st.file_uploader("Загрузите фото воды", type=["jpg", "jpeg", "png"])
     camera_file = st.camera_input("Или сделайте фото через камеру")
-  
     photo = uploaded_file or camera_file
     if photo:
         st.image(photo, caption="Фото для анализа", use_container_width=True)
-      
         if st.button("🔍 Запустить профессиональный анализ фото", type="primary"):
             analysis = analyze_photo_with_groq(photo, selected_name)
             st.success("✅ Анализ фото завершён")
@@ -234,7 +333,6 @@ with tab3:
     st.subheader("📈 История измерений")
     if 'history' not in st.session_state:
         st.session_state.history = []
-  
     if st.button("📌 Сохранить текущие показания"):
         st.session_state.history.append({
             "Время": datetime.now().strftime("%H:%M"),
@@ -245,7 +343,6 @@ with tab3:
             "Водоём": selected_name
         })
         st.success("Показания сохранены!")
-  
     if st.session_state.history:
         df = pd.DataFrame(st.session_state.history)
         st.dataframe(df, use_container_width=True)
