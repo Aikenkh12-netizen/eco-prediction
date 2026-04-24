@@ -116,7 +116,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-GROQ_API_KEY = "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"
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
 # ====================== БАЗА ДАННЫХ ======================
 LAKES_DB = {
