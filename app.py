@@ -112,7 +112,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+GROQ_API_KEY = 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
 
 LAKES_DB = {
     "Каспийское море": {"coords": [43.6500, 51.1500], "type": "Морской", "risk": "Нефтяные загрязнения"},
