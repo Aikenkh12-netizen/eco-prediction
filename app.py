@@ -9,8 +9,6 @@ import base64
 import serial
 import time
 import os
-
-# ====================== КОНФИГУРАЦИЯ ======================
 st.set_page_config(
     page_title="SuVision Global AI",
     layout="wide",
@@ -18,10 +16,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ====================== КАСТОМНЫЙ ДИЗАЙН ======================
 st.markdown("""
 <style>
-    /* ====================== ГЛОБАЛЬНАЯ ТЕМА ====================== */
+   
     .stApp {
         background: linear-gradient(180deg, #0a1428 0%, #0f253f 100%);
         color: #e0f7ff;
@@ -32,7 +29,7 @@ st.markdown("""
         padding-bottom: 3rem;
         max-width: 1400px;
     }
-    /* ====================== ЗАГОЛОВОК ====================== */
+    
     .main-header {
         background: linear-gradient(90deg, #00d4ff, #0099cc);
         color: white;
@@ -58,7 +55,7 @@ st.markdown("""
     @keyframes shine {
         100% { transform: translateX(200%); }
     }
-    /* ====================== СТАТУС ====================== */
+    
     .status-container {
         background: rgba(255,255,255,0.08);
         backdrop-filter: blur(12px);
@@ -71,7 +68,7 @@ st.markdown("""
         justify-content: space-between;
         box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     }
-    /* ====================== МЕТРИКИ ====================== */
+    
     .stMetric {
         background: rgba(255,255,255,0.09) !important;
         border-radius: 18px !important;
@@ -92,7 +89,6 @@ st.markdown("""
         font-size: 1.65rem !important;
         font-weight: 700;
     }
-    /* ====================== КНОПКИ ====================== */
     .stButton button {
         background: linear-gradient(90deg, #00d4ff, #00aaff) !important;
         color: white !important;
@@ -108,7 +104,7 @@ st.markdown("""
         transform: translateY(-3px) scale(1.03);
         box-shadow: 0 12px 28px rgba(0, 212, 255, 0.45) !important;
     }
-    /* ====================== САЙДБАР ====================== */
+
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0a1f35, #0f2a45) !important;
         border-right: 4px solid #00d4ff;
@@ -118,7 +114,6 @@ st.markdown("""
 
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
-# ====================== БАЗА ДАННЫХ ======================
 LAKES_DB = {
     "Каспийское море": {"coords": [43.6500, 51.1500], "type": "Морской", "risk": "Нефтяные загрязнения"},
     "Озеро Балхаш": {"coords": [46.5400, 74.8700], "type": "Бессточный", "risk": "Тяжелые металлы и усыхание"},
@@ -138,7 +133,7 @@ LAKES_DB = {
     "Озеро Тузколь": {"coords": [43.0000, 74.5000], "type": "Соленое", "risk": "Минерализация"}
 }
 
-# ====================== СОХРАНЕНИЕ ПАРАМЕТРОВ ======================
+
 if 'lake_params' not in st.session_state:
     st.session_state.lake_params = {
         name: {"ph": 7.2, "temp": 18.0, "turb": 4.0} for name in LAKES_DB.keys()
@@ -152,7 +147,7 @@ if 'history' not in st.session_state:
 if 'last_live_values' not in st.session_state:
     st.session_state.last_live_values = {}
 
-# ====================== БОКОВАЯ ПАНЕЛЬ ======================
+
 with st.sidebar:
     st.title("🚀 SuVision Core")
     selected_name = st.selectbox("🎯 Станция мониторинга", list(LAKES_DB.keys()))
@@ -170,7 +165,7 @@ with st.sidebar:
         st.rerun()
     st.session_state.lake_params[selected_name] = {"ph": ph, "temp": temp, "turb": turb}
     
-    # ====================== ARDUINO ======================
+    
     st.divider()
     st.subheader("🔌 Arduino Uno (датчики)")
  
@@ -227,7 +222,7 @@ with st.sidebar:
 
     st.caption("Ожидаемый формат от Arduino:\n`ph:7.45,temp:23.1,turb:4.2`")
 
-# ====================== РАСЧЁТЫ ======================
+
 def calculate_sri(p, t, tr):
     return max(round(10 - (abs(p-7)*1.5 + (t/10)*0.8 + (tr/20)*1.2), 2), 0.0)
 
@@ -242,7 +237,7 @@ def get_status(ph_val, temp_val, turb_val):
 
 status_text, status_type = get_status(ph, temp, turb)
 
-# ====================== Groq функции ======================
+
 def get_ai_report(lake_name, ph, temp, turb, sri, risk):
     url = "https://api.groq.com/openai/v1/chat/completions"
     prompt = f"""Ты опытный эколог-гидролог. Кратко проанализируй состояние водоёма.
@@ -318,7 +313,7 @@ def analyze_photo_with_groq(image_file, lake_name):
     except Exception as e:
         return f"Ошибка анализа фото: {str(e)}"
 
-# ====================== ОСНОВНОЙ ИНТЕРФЕЙС ======================
+
 st.markdown('<div class="main-header"><h1 style="margin:0;font-size:3em;font-weight:800;">🌊 SuVision Global AI</h1><p style="margin:8px 0 0 0;font-size:1.35em;opacity:0.95;">Глобальный мониторинг водоёмов Казахстана • Работает на Groq</p></div>', unsafe_allow_html=True)
 
 st.markdown(f"""
@@ -407,7 +402,7 @@ with tab3:
 
 st.caption("SuVision Global AI • Работает на Groq + Arduino Uno • Параметры сохраняются отдельно для каждого водоёма 💧")
 
-# ====================== NON-STOP ПОТОК С АВТОСОХРАНЕНИЕМ ======================
+
 if st.session_state.get("live_mode", False) and st.session_state.get('ser') and st.session_state.ser and st.session_state.ser.is_open:
     try:
         line = st.session_state.ser.readline().decode('utf-8').strip()
@@ -427,7 +422,6 @@ if st.session_state.get("live_mode", False) and st.session_state.get('ser') and 
                 "ph": new_ph, "temp": new_temp, "turb": new_turb
             }
             
-            # === АВТОМАТИЧЕСКОЕ СОХРАНЕНИЕ В ИСТОРИЮ ПРИ ИЗМЕНЕНИИ ===
             current_values = (new_ph, new_temp, new_turb)
             last_values = st.session_state.last_live_values.get(selected_name)
             
